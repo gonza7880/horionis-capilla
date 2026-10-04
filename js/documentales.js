@@ -1,0 +1,6 @@
+let visible=18,current='Todos',term='',videos=[];
+document.addEventListener('DOMContentLoaded',async()=>{await window.HORIONIS_READY;videos=POSTS.filter(p=>firstVideoId(p)||(p.categories||[]).includes('Documentales'));render()});
+function docArr(){return videos.filter(p=>(current==='Todos'||(p.categories||[]).includes(current))&&(!term||(`${p.title} ${p.excerpt}`.toLowerCase().includes(term))))}
+function render(){const a=docArr();document.getElementById('blogGrid').innerHTML=a.slice(0,visible).map(postCard).join('')||'<div class="no-results">No encontramos material para ese criterio.</div>';document.getElementById('loadMore').style.display=visible>=a.length?'none':'inline-flex';mountReveal()}
+document.addEventListener('input',e=>{if(e.target.id==='archiveSearch'){term=e.target.value.toLowerCase();visible=18;render()}});
+document.addEventListener('click',e=>{const f=e.target.closest('.filter-btn');if(f){document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));f.classList.add('active');current=f.dataset.cat;visible=18;render()}if(e.target.closest('#loadMore')){visible+=18;render()}});
