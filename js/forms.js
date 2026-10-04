@@ -1,0 +1,1 @@
+document.addEventListener('DOMContentLoaded',()=>{document.querySelectorAll('[data-demo-form]').forEach(form=>form.addEventListener('submit',e=>{e.preventDefault();const s=form.querySelector('.form-status');if(s)s.textContent='Canal listo para conectar. Antes de publicar en horionis.com lo dejamos enviando por email sin recargar la página.';form.reset()}))});
