@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
+    {"src": "/wp-json/(.*)", "dest": "http://157.245.126.149/wp-json/$1"},
+    {"src": "/wp-content/(.*)", "dest": "http://157.245.126.149/wp-content/$1"},
     {"src": "/", "dest": "/index.html"},
     {"src": "/archivo/?", "dest": "/archivo.html"},
     {"src": "/documentales/?", "dest": "/documentales.html"},
