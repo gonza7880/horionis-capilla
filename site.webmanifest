@@ -1,0 +1,9 @@
+{
+  "name": "Horionis — Misterios y Enigmas del Cosmos",
+  "short_name": "Horionis",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#02030a",
+  "theme_color": "#02030a",
+  "icons": []
+}
