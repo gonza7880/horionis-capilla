@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="Horionis">
+<defs><linearGradient id="g" x1="10" y1="86" x2="86" y2="10" gradientUnits="userSpaceOnUse"><stop stop-color="#72E8FF"/><stop offset=".56" stop-color="#F6F8FF"/><stop offset="1" stop-color="#9A86FF"/></linearGradient></defs>
+<circle cx="48" cy="48" r="35.5" fill="none" stroke="url(#g)" stroke-width="3" opacity=".92"/>
+<ellipse cx="48" cy="48" rx="44" ry="17" fill="none" stroke="url(#g)" stroke-width="1.7" transform="rotate(-24 48 48)" opacity=".55"/>
+<path d="M33 68V31h7v14.4c3.3-4.1 7.3-6.1 12-6.1 8.4 0 13.5 5.4 13.5 14.3V68h-7V54.7c0-6.1-2.8-9.2-8.1-9.2-6 0-10.4 4.4-10.4 11V68z" fill="url(#g)"/>
+<circle cx="76.5" cy="27" r="3.3" fill="#72E8FF"><animate attributeName="opacity" values=".45;1;.45" dur="2.4s" repeatCount="indefinite"/></circle>
+</svg>
