@@ -1,0 +1,1 @@
+window.HORIONIS_COUNTS={"Ciencia":23,"Historia":21,"Misterio":53,"OVNIS":42,"Documentales":55,"Tecnología":2,"Tiempo":3,"Astronauta":1,"Imagenes":2,"Horionis":18,"Congreso":3,"Entrevista":1,"Peliculas":1,"News":2,"Entrevistas":2,"Uncategorized":7,"Exopolitica":1};
