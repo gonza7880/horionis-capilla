@@ -1,7 +1,7 @@
 window.HORIONIS_POSTS=[];
 window.HORIONIS_COUNTS={};
 window.HORIONIS_READY=(async()=>{
-  const BASE='https://horionis.com/wp-json/wp/v2';
+  const BASE='/wp-json/wp/v2';
   const decode=s=>{const t=document.createElement('textarea');t.innerHTML=s||'';return t.value};
   const strip=s=>decode(String(s||'').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim());
   const req=async url=>{const r=await fetch(url,{mode:'cors',credentials:'omit'});if(!r.ok)throw new Error(`WP API ${r.status}`);return r.json()};
