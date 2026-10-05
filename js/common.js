@@ -1,7 +1,29 @@
-const POSTS=window.HORIONIS_POSTS||[];const COUNTS=window.HORIONIS_COUNTS||{};const FALLBACKS=['https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=80','https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80','https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=1600&q=80','https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1400&q=80'];
-function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+const POSTS=window.HORIONIS_POSTS||[];const COUNTS=window.HORIONIS_COUNTS||{};const FALLBACK_POOLS={
+  ovnis:['/assets/fallbacks/ovnis-1.svg','/assets/fallbacks/ovnis-2.svg','/assets/fallbacks/ovnis-3.svg'],
+  cosmos:['/assets/fallbacks/cosmos-1.svg','/assets/fallbacks/cosmos-2.svg','/assets/fallbacks/cosmos-3.svg'],
+  historia:['/assets/fallbacks/historia-1.svg','/assets/fallbacks/historia-2.svg','/assets/fallbacks/historia-3.svg'],
+  ciencia:['/assets/fallbacks/ciencia-1.svg','/assets/fallbacks/ciencia-2.svg','/assets/fallbacks/ciencia-3.svg'],
+  eventos:['/assets/fallbacks/eventos-1.svg','/assets/fallbacks/eventos-2.svg','/assets/fallbacks/eventos-3.svg'],
+  misterio:['/assets/fallbacks/misterio-1.svg','/assets/fallbacks/misterio-2.svg','/assets/fallbacks/misterio-3.svg']
+};
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]))}
 function fmtDate(s){if(!s)return'';const d=new Date(s.replace(' ','T'));return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}
-function fallbackFor(post,i=0){const c=(post.categories||[]).join(' ').toLowerCase();if(c.includes('ovni'))return'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1400&q=80';if(c.includes('historia'))return'https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=1600&q=80';if(c.includes('ciencia'))return'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=80';if(c.includes('misterio'))return'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80';return FALLBACKS[i%FALLBACKS.length]}
+function coverHash(s=''){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
+function fallbackTheme(post){
+  const text=`${post?.title||''} ${post?.excerpt||''} ${(post?.categories||[]).join(' ')}`.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(/congreso|conferencia|entrevista|documental|presentacion|radio|trailer|evento|charla/.test(text))return'eventos';
+  if(/ovni|ufo|alien|extraterrestre|abducc|roswell|area 51|nave|contacto|platillo|no identificado/.test(text))return'ovnis';
+  if(/luna|marte|planeta|galax|universo|cosmos|astronom|estrella|sol|astronauta|espacio|meteor|cometa/.test(text))return'cosmos';
+  if(/egipto|nazi|arqueolog|civiliz|antigu|templo|historia|piramid|mito|leyenda|ritual/.test(text))return'historia';
+  if(/ciencia|tiempo|tecnolog|tesla|experimento|teletransport|fisica|energia|dimension|maquina/.test(text))return'ciencia';
+  return'misterio';
+}
+function fallbackFor(post,i=0){
+  const theme=fallbackTheme(post),pool=FALLBACK_POOLS[theme]||FALLBACK_POOLS.misterio;
+  const key=post?.slug||post?.title||String(i);
+  return pool[coverHash(key)%pool.length];
+}
 const LEGACY_MEDIA_ARCHIVE={
 '/wp-content/uploads/2019/06/afichecongresocurvas.png':'https://web.archive.org/web/20191211011408id_/http://horionis.com/wp-content/uploads/2019/06/afichecongresocurvas.png',
 '/wp-content/uploads/2022/10/afichecongresocurvas.png':'https://web.archive.org/web/20230130234029id_/http://horionis.com/wp-content/uploads/2022/10/afichecongresocurvas.png'
