@@ -76,6 +76,7 @@ function repairLegacyMedia(root){
   });
 }
 function firstContentImage(post){
+  if(post?.contentImage)return post.contentImage;
   const m=(post?.content||'').match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i);
   if(!m)return'';
   const src=m[1].replace(/&amp;/g,'&');
