@@ -6,7 +6,7 @@ const POSTS=window.HORIONIS_POSTS||[];const COUNTS=window.HORIONIS_COUNTS||{};co
   eventos:['/assets/fallbacks/eventos-1.svg','/assets/fallbacks/eventos-2.svg','/assets/fallbacks/eventos-3.svg'],
   misterio:['/assets/fallbacks/misterio-1.svg','/assets/fallbacks/misterio-2.svg','/assets/fallbacks/misterio-3.svg']
 };
-function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[m]))}
+function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function fmtDate(s){if(!s)return'';const d=new Date(s.replace(' ','T'));return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}
 function coverHash(s=''){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return h>>>0}
 function fallbackTheme(post){
