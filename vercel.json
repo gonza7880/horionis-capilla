@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
     {"src": "/wp-json/(.*)", "dest": "http://157.245.126.149/wp-json/$1"},
-    {"src": "/wp-content/(.*)", "dest": "http://157.245.126.149/wp-content/$1"},
+    {"src": "/wp-content/(.*)", "dest": "http://157.245.126.149/wp-content/$1", "headers": {"Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000"}},
     {"src": "/", "dest": "/index.html"},
     {"src": "/archivo/?", "dest": "/archivo.html"},
     {"src": "/documentales/?", "dest": "/documentales.html"},
@@ -14,7 +14,7 @@
     {"src": "/site.webmanifest", "dest": "/site.webmanifest"},
     {"src": "/assets/(.*)", "dest": "/assets/$1", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}},
     {"src": "/css/(.*)", "dest": "/css/$1", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}},
-    {"src": "/js/(.*)", "dest": "/js/$1"},
+    {"src": "/js/(.*)", "dest": "/js/$1", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}},
     {"src": "/(?<slug>[^/.]+)/?", "dest": "/article.html?slug=$slug"},
     {"src": "/.*", "dest": "/404.html", "status": 404}
   ]
