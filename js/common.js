@@ -2,7 +2,43 @@ const POSTS=window.HORIONIS_POSTS||[];const COUNTS=window.HORIONIS_COUNTS||{};co
 function esc(s=''){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
 function fmtDate(s){if(!s)return'';const d=new Date(s.replace(' ','T'));return d.toLocaleDateString('es-AR',{day:'2-digit',month:'short',year:'numeric'})}
 function fallbackFor(post,i=0){const c=(post.categories||[]).join(' ').toLowerCase();if(c.includes('ovni'))return'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=1400&q=80';if(c.includes('historia'))return'https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?auto=format&fit=crop&w=1600&q=80';if(c.includes('ciencia'))return'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?auto=format&fit=crop&w=1600&q=80';if(c.includes('misterio'))return'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80';return FALLBACKS[i%FALLBACKS.length]}
-function imgFor(post,i=0){return post.thumbnail||fallbackFor(post,i)}function articleUrl(p){return`/${encodeURIComponent(p.slug)}`}
+const LEGACY_MEDIA_ARCHIVE={
+'/wp-content/uploads/2019/06/afichecongresocurvas.png':'https://web.archive.org/web/20191211011408id_/http://horionis.com/wp-content/uploads/2019/06/afichecongresocurvas.png',
+'/wp-content/uploads/2022/10/afichecongresocurvas.png':'https://web.archive.org/web/20230130234029id_/http://horionis.com/wp-content/uploads/2022/10/afichecongresocurvas.png'
+};
+const HISTORICAL_COVERS={
+'2o-congreso-de-enigmas-y-misterios-del-cosmos':LEGACY_MEDIA_ARCHIVE['/wp-content/uploads/2019/06/afichecongresocurvas.png'],
+'3er-congreso-de-enigmas-y-misterios-del-cosmos':LEGACY_MEDIA_ARCHIVE['/wp-content/uploads/2022/10/afichecongresocurvas.png'],
+'trailer-3er-congreso-enigmas-y-misterios-del-cosmos':LEGACY_MEDIA_ARCHIVE['/wp-content/uploads/2022/10/afichecongresocurvas.png']
+};
+function legacyArchiveUrl(src=''){try{return LEGACY_MEDIA_ARCHIVE[new URL(src,location.origin).pathname]||''}catch{return''}}
+function legacyPlaceholder(label='Archivo multimedia'){
+  const safe=String(label||'Archivo multimedia').replace(/[&<>"]/g,'').slice(0,46);
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#070a18"/><stop offset="1" stop-color="#10162e"/></linearGradient><radialGradient id="r"><stop stop-color="#72e8ff" stop-opacity=".22"/><stop offset="1" stop-color="#72e8ff" stop-opacity="0"/></radialGradient></defs><rect width="800" height="500" fill="url(#g)"/><circle cx="630" cy="110" r="210" fill="url(#r)"/><circle cx="400" cy="250" r="150" fill="none" stroke="#72e8ff" stroke-opacity=".17"/><circle cx="400" cy="250" r="95" fill="none" stroke="#9a86ff" stroke-opacity=".13" stroke-dasharray="7 10"/><text x="48" y="72" fill="#72e8ff" font-family="Arial,sans-serif" font-size="17" letter-spacing="4">ARCHIVO HORIONIS</text><text x="48" y="365" fill="#f6f8ff" font-family="Arial,sans-serif" font-size="30" font-weight="700">${safe}</text><text x="48" y="405" fill="#8995b5" font-family="Arial,sans-serif" font-size="17">Imagen histórica no recuperada del servidor original</text></svg>`;
+  return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg);
+}
+function repairLegacyMedia(root){
+  if(!root)return;
+  root.querySelectorAll('img').forEach(img=>{
+    const original=img.getAttribute('src')||'';
+    const archived=legacyArchiveUrl(original);
+    if(archived)img.src=archived;
+    const fail=()=>{
+      if(img.dataset.legacyFallback==='1')return;
+      img.dataset.legacyFallback='1';
+      const figure=img.closest('figure');
+      const caption=figure?.querySelector('figcaption')?.textContent?.trim();
+      const label=caption||img.alt||'Archivo multimedia';
+      img.onerror=null;
+      img.src=legacyPlaceholder(label);
+      img.classList.add('legacy-media-placeholder');
+      img.title='La imagen original ya no está disponible en el servidor histórico.';
+    };
+    img.addEventListener('error',fail,{once:true});
+    requestAnimationFrame(()=>{if(img.complete&&img.naturalWidth===0)fail()});
+  });
+}
+function imgFor(post,i=0){return HISTORICAL_COVERS[post.slug]||post.thumbnail||fallbackFor(post,i)}function articleUrl(p){return`/${encodeURIComponent(p.slug)}`}
 function mountNav(){const nav=document.querySelector('.nav');if(!nav)return;const tick=()=>nav.classList.toggle('scrolled',scrollY>18);tick();addEventListener('scroll',tick,{passive:true});const b=document.querySelector('.menu-btn');if(b)b.onclick=()=>document.querySelector('.nav-links')?.classList.toggle('mobile-open')}
 function mountReveal(){if(matchMedia('(prefers-reduced-motion: reduce)').matches){document.querySelectorAll('.reveal').forEach(e=>e.classList.add('in'));return}const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.08});document.querySelectorAll('.reveal:not(.in)').forEach(el=>io.observe(el))}
 function mountCursor(){const g=document.querySelector('.cursor-glow');if(!g||matchMedia('(pointer:coarse)').matches)return;addEventListener('pointermove',e=>{g.style.left=e.clientX+'px';g.style.top=e.clientY+'px'},{passive:true})}
