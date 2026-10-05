@@ -12,11 +12,11 @@ function coverHash(s=''){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charC
 function fallbackTheme(post){
   const text=`${post?.title||''} ${post?.excerpt||''} ${(post?.categories||[]).join(' ')}`.toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  if(/congreso|conferencia|entrevista|documental|presentacion|radio|trailer|evento|charla/.test(text))return'eventos';
   if(/ovni|ufo|alien|extraterrestre|abducc|roswell|area 51|nave|contacto|platillo|no identificado/.test(text))return'ovnis';
   if(/luna|marte|planeta|galax|universo|cosmos|astronom|estrella|sol|astronauta|espacio|meteor|cometa/.test(text))return'cosmos';
   if(/egipto|nazi|arqueolog|civiliz|antigu|templo|historia|piramid|mito|leyenda|ritual/.test(text))return'historia';
   if(/ciencia|tiempo|tecnolog|tesla|experimento|teletransport|fisica|energia|dimension|maquina/.test(text))return'ciencia';
+  if(/congreso|conferencia|entrevista|documental|presentacion|radio|trailer|evento|charla/.test(text))return'eventos';
   return'misterio';
 }
 function fallbackFor(post,i=0){
