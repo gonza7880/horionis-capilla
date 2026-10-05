@@ -93,5 +93,15 @@ function mountTilt(){if(matchMedia('(pointer:coarse)').matches)return;document.q
 function firstVideoId(p){const s=p.content||'';let m=s.match(/youtube\.com\/embed\/([\w-]+)/i)||s.match(/youtube\.com\/watch\?v=([\w-]+)/i)||s.match(/youtu\.be\/([\w-]+)/i);return m?m[1]:''}
 function normalizeLegacyHtml(content=''){const clean=content.replace(/<script[\s\S]*?<\/script>/gi,'').replace(/<style[\s\S]*?<\/style>/gi,'').replace(/\son\w+\s*=\s*(["']).*?\1/gi,'').replace(/javascript:/gi,'').replace(/<!--more-->/gi,'').replace(/\swidth=["']\d+["']/gi,'').replace(/\sheight=["']\d+["']/gi,'');const chunks=clean.split(/\n\s*\n+/).map(s=>s.trim()).filter(Boolean);return chunks.map(ch=>/^<(?:p|div|iframe|img|ul|ol|blockquote|h[1-6]|table|figure|video)\b/i.test(ch)?ch:`<p>${ch.replace(/\n/g,'<br>')}</p>`).join('\n')}
 function postCard(p,i=0){return`<article class="post-card reveal"><a href="${articleUrl(p)}"><div class="post-media"><img loading="lazy" src="${esc(imgFor(p,i))}" onerror="this.onerror=null;this.src='${fallbackFor(p,i)}'" alt=""></div><div class="post-body"><div class="post-meta"><span>${esc((p.categories||[])[0]||'Archivo')}</span><span>${fmtDate(p.date)}</span></div><h3>${esc(p.title)}</h3><p>${esc(p.excerpt||'Exploración del archivo Horionis.')}</p><span class="readmore">Abrir expediente →</span></div></a></article>`}
+function mountImageSafety(){
+  document.addEventListener('error',e=>{
+    const img=e.target;
+    if(!(img instanceof HTMLImageElement)||img.dataset.horionisSafe==='1')return;
+    img.dataset.horionisSafe='1';
+    img.onerror=null;
+    const pseudo={slug:location.pathname,title:img.alt||document.title,categories:[]};
+    img.src=fallbackFor(pseudo,coverHash(img.currentSrc||img.src||location.pathname));
+  },true);
+}
 function footerYear(){const y=document.getElementById('year');if(y)y.textContent=new Date().getFullYear()}
-function initCommon(){mountNav();mountReveal();mountCursor();mountStars();mountTilt();footerYear()}document.addEventListener('DOMContentLoaded',initCommon);
+function initCommon(){mountNav();mountReveal();mountCursor();mountStars();mountTilt();mountImageSafety();footerYear()}document.addEventListener('DOMContentLoaded',initCommon);
