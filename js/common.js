@@ -6,6 +6,19 @@ const LEGACY_MEDIA_ARCHIVE={
 '/wp-content/uploads/2019/06/afichecongresocurvas.png':'https://web.archive.org/web/20191211011408id_/http://horionis.com/wp-content/uploads/2019/06/afichecongresocurvas.png',
 '/wp-content/uploads/2022/10/afichecongresocurvas.png':'https://web.archive.org/web/20230130234029id_/http://horionis.com/wp-content/uploads/2022/10/afichecongresocurvas.png'
 };
+const LEGACY_MEDIA_MISSING=new Set([
+'/wp-content/uploads/2019/06/Zerpa.jpg',
+'/wp-content/uploads/2019/06/Yohanan.jpg',
+'/wp-content/uploads/2019/06/lorenzo.jpg',
+'/wp-content/uploads/2019/06/abel.jpg',
+'/wp-content/uploads/2019/06/juan_andres.jpg',
+'/wp-content/uploads/2019/06/ricardo.jpg',
+'/wp-content/uploads/2019/06/giorgio.jpg',
+'/wp-content/uploads/2019/06/paul.jpg',
+'/wp-content/uploads/2019/06/logo_legado.png',
+'/wp-content/uploads/2019/06/logo_horionis.png',
+'/wp-content/uploads/2019/06/logo_capilla_del_monte.png'
+]);
 const HISTORICAL_COVERS={
 '2o-congreso-de-enigmas-y-misterios-del-cosmos':LEGACY_MEDIA_ARCHIVE['/wp-content/uploads/2019/06/afichecongresocurvas.png'],
 '3er-congreso-de-enigmas-y-misterios-del-cosmos':LEGACY_MEDIA_ARCHIVE['/wp-content/uploads/2022/10/afichecongresocurvas.png'],
@@ -21,6 +34,7 @@ function repairLegacyMedia(root){
   if(!root)return;
   root.querySelectorAll('img').forEach(img=>{
     const original=img.getAttribute('src')||'';
+    let pathname='';try{pathname=new URL(original,location.origin).pathname}catch{}
     const archived=legacyArchiveUrl(original);
     if(archived)img.src=archived;
     const fail=()=>{
@@ -34,6 +48,7 @@ function repairLegacyMedia(root){
       img.classList.add('legacy-media-placeholder');
       img.title='La imagen original ya no está disponible en el servidor histórico.';
     };
+    if(LEGACY_MEDIA_MISSING.has(pathname)){fail();return}
     img.addEventListener('error',fail,{once:true});
     requestAnimationFrame(()=>{if(img.complete&&img.naturalWidth===0)fail()});
   });
