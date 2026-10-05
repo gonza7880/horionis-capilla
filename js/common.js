@@ -53,7 +53,16 @@ function repairLegacyMedia(root){
     requestAnimationFrame(()=>{if(img.complete&&img.naturalWidth===0)fail()});
   });
 }
-function imgFor(post,i=0){return HISTORICAL_COVERS[post.slug]||post.thumbnail||fallbackFor(post,i)}function articleUrl(p){return`/${encodeURIComponent(p.slug)}`}
+function firstContentImage(post){
+  const m=(post?.content||'').match(/<img\b[^>]*\bsrc=["']([^"']+)["']/i);
+  if(!m)return'';
+  const src=m[1].replace(/&amp;/g,'&');
+  let pathname='';try{pathname=new URL(src,location.origin).pathname}catch{}
+  if(LEGACY_MEDIA_ARCHIVE[pathname])return LEGACY_MEDIA_ARCHIVE[pathname];
+  if(LEGACY_MEDIA_MISSING.has(pathname))return'';
+  return src;
+}
+function imgFor(post,i=0){return HISTORICAL_COVERS[post.slug]||post.thumbnail||firstContentImage(post)||fallbackFor(post,i)}function articleUrl(p){return`/${encodeURIComponent(p.slug)}`}
 function mountNav(){const nav=document.querySelector('.nav');if(!nav)return;const tick=()=>nav.classList.toggle('scrolled',scrollY>18);tick();addEventListener('scroll',tick,{passive:true});const b=document.querySelector('.menu-btn');if(b)b.onclick=()=>document.querySelector('.nav-links')?.classList.toggle('mobile-open')}
 function mountReveal(){if(matchMedia('(prefers-reduced-motion: reduce)').matches){document.querySelectorAll('.reveal').forEach(e=>e.classList.add('in'));return}const io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}}),{threshold:.08});document.querySelectorAll('.reveal:not(.in)').forEach(el=>io.observe(el))}
 function mountCursor(){const g=document.querySelector('.cursor-glow');if(!g||matchMedia('(pointer:coarse)').matches)return;addEventListener('pointermove',e=>{g.style.left=e.clientX+'px';g.style.top=e.clientY+'px'},{passive:true})}
