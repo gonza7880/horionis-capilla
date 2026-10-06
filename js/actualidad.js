@@ -24,7 +24,7 @@ function mountChannelPlayers(root=document){
   });
 }
 async function getActualidad(){
-  const r=await fetch('/api/actualidad',{headers:{accept:'application/json'}});
+  const r=await fetch('/api/actualidad?rev=20261005-2300',{headers:{accept:'application/json'}});
   if(!r.ok)throw new Error('Actualidad '+r.status);return r.json();
 }
 async function renderActualidadPage(){
