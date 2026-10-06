@@ -1,9 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
+    {"src": "/api/actualidad/?", "dest": "/api/actualidad.mjs"},
     {"src": "/wp-json/(.*)", "dest": "http://157.245.126.149/wp-json/$1"},
     {"src": "/wp-content/(.*)", "dest": "http://157.245.126.149/wp-content/$1", "headers": {"Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000"}},
     {"src": "/", "dest": "/index.html"},
+    {"src": "/actualidad/?", "dest": "/actualidad.html"},
     {"src": "/archivo/?", "dest": "/archivo.html"},
     {"src": "/documentales/?", "dest": "/documentales.html"},
     {"src": "/sobre-horionis/?", "dest": "/sobre.html"},
