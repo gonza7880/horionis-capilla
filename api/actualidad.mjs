@@ -71,33 +71,22 @@ function googleArticleId(sourceUrl=''){
     return u.hostname==='news.google.com'&&m?m[1]:'';
   }catch{return''}
 }
-async function googleDecodeParams(sourceUrl,index){
-  const id=googleArticleId(sourceUrl);if(!id)return null;
+async function decodeGoogleNewsUrl(sourceUrl){
+  const id=googleArticleId(sourceUrl);if(!id)return sourceUrl;
   try{
-    const r=await getText('https://news.google.com/rss/articles/'+id,4200,{
+    const page=await getText('https://news.google.com/rss/articles/'+id,4200,{
       'accept-language':'en-US,en;q=0.9',
       'referer':'https://news.google.com/'
     });
-    const sig=(r.text.match(/data-n-a-sg=["']([^"']+)["']/)||[])[1];
-    const ts=(r.text.match(/data-n-a-ts=["']([^"']+)["']/)||[])[1];
-    return sig&&ts?{index,id,sig,ts:Number(ts)}:null;
-  }catch{return null}
-}
-async function decodeGoogleNewsBatch(items){
-  const settled=await Promise.allSettled(items.map((n,i)=>googleDecodeParams(n.url,i)));
-  const params=settled.flatMap(r=>r.status==='fulfilled'&&r.value?[r.value]:[]);
-  if(!params.length)return items.map(n=>({...n,publisherUrl:n.url}));
-  try{
-    const reqs=params.map(p=>[
-      'Fbv4je',
-      JSON.stringify([
-        'garturlreq',
-        [['X','X',['X','X'],null,null,1,1,'US:en',null,1,null,null,null,null,null,0,1],'X','X',1,[1,1,1],1,1,null,0,0,null,0],
-        p.id,p.ts,p.sig
-      ])
+    const sig=(page.text.match(/data-n-a-sg=["']([^"']+)["']/)||[])[1];
+    const ts=(page.text.match(/data-n-a-ts=["']([^"']+)["']/)||[])[1];
+    if(!sig||!ts)return sourceUrl;
+    const inner=JSON.stringify([
+      'garturlreq',
+      [['X','X',['X','X'],null,null,1,1,'US:en',null,1,null,null,null,null,null,0,1],'X','X',1,[1,1,1],1,1,null,0,0,null,0],
+      id,Number(ts),sig
     ]);
-    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),6500);
-    let txt='';
+    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),6000);
     try{
       const res=await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute',{
         method:'POST',signal:ctrl.signal,
@@ -110,35 +99,27 @@ async function decodeGoogleNewsBatch(items){
           'referer':'https://news.google.com/',
           'x-same-domain':'1'
         },
-        body:'f.req='+encodeURIComponent(JSON.stringify([reqs]))
+        body:'f.req='+encodeURIComponent(JSON.stringify([[['Fbv4je',inner]]]))
       });
-      if(!res.ok)throw new Error('Google decode '+res.status);
-      txt=await res.text();
+      if(!res.ok)return sourceUrl;
+      const txt=await res.text();
+      for(const chunk of txt.split('\n\n')){
+        try{
+          const parsed=JSON.parse(chunk.trim());
+          if(!Array.isArray(parsed))continue;
+          for(const row of parsed){
+            if(!Array.isArray(row)||row[1]!=='Fbv4je'||typeof row[2]!=='string')continue;
+            const decoded=JSON.parse(row[2])?.[1];
+            if(typeof decoded==='string'&&/^https?:\/\//.test(decoded))return decoded;
+          }
+        }catch{}
+      }
+      return sourceUrl;
     }finally{clearTimeout(timer)}
-    let rows=[];
-    for(const chunk of txt.split('\n\n')){
-      try{
-        const parsed=JSON.parse(chunk.trim());
-        if(Array.isArray(parsed)&&parsed.some(row=>Array.isArray(row)&&typeof row[2]==='string')){rows=parsed;break}
-      }catch{}
-    }
-    const responseRows=rows.filter(row=>Array.isArray(row)&&row[1]==='Fbv4je').slice(0,params.length);
-    const urls=responseRows.map(row=>{
-      if(typeof row[2]!=='string')return null;
-      try{
-        const inner=JSON.parse(row[2]),url=inner?.[1];
-        return typeof url==='string'&&/^https?:\/\//.test(url)?url:null;
-      }catch{return null}
-    });
-    const decoded=new Map();
-    params.forEach((p,i)=>{if(urls[i])decoded.set(p.index,urls[i])});
-    return items.map((n,i)=>({...n,publisherUrl:decoded.get(i)||n.url}));
-  }catch{
-    return items.map(n=>({...n,publisherUrl:n.url}));
-  }
+  }catch{return sourceUrl}
 }
 async function enrichNews(n){
-  const candidate=n.publisherUrl||n.url;
+  const candidate=await decodeGoogleNewsUrl(n.url);
   try{
     const first=await getText(candidate,5200);
     const finalUrl=first.url||candidate;
@@ -148,6 +129,17 @@ async function enrichNews(n){
     }
     return {...n,url:finalUrl,image:metaImage(first.text)||''};
   }catch{return {...n,url:candidate,image:''}}
+}
+async function mapLimit(items,limit,worker){
+  const out=new Array(items.length);let next=0;
+  async function run(){
+    while(true){
+      const i=next++;if(i>=items.length)return;
+      try{out[i]=await worker(items[i],i)}catch{out[i]=items[i]}
+    }
+  }
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},()=>run()));
+  return out;
 }
 function jsonText(s=''){
   try{return JSON.parse('"'+s+'"')}catch{return s.replace(/\\u0026/g,'&').replace(/\\n/g,' ').replace(/\\\"/g,'"')}
@@ -195,8 +187,7 @@ export async function GET(){
   ]);
   let news=newsSettled.flatMap(r=>r.status==='fulfilled'?parseNews(r.value):[]).filter(relevant);
   news=dedupe(news,x=>x.title.toLowerCase().replace(/\s+/g,' ').trim()).sort((a,b)=>time(b)-time(a)).slice(0,18);
-  const decodedNews=await decodeGoogleNewsBatch(news);
-  const enriched=await Promise.all(decodedNews.map(enrichNews));
+  const enriched=await mapLimit(news,6,enrichNews);
   const channels=channelSettled.map((r,i)=>r.status==='fulfilled'?r.value:CHANNELS[i]);
   return new Response(JSON.stringify({generatedAt:new Date().toISOString(),news:enriched,channels}),{
     status:200,
