@@ -29,7 +29,7 @@ function time(x){const t=Date.parse(x.date||'');return Number.isFinite(t)?t:0}
 function dedupe(items,keyFn){const seen=new Set();return items.filter(x=>{const k=keyFn(x);if(seen.has(k))return false;seen.add(k);return true})}
 function relevant(n){
   const t=n.title||'';
-  if(/nasdaq|etf|stock|shares|investor|running shoe|shoe review|album|single|song|music release/i.test(t))return false;
+  if(/nasdaq|etf|stock|shares|investor|running shoe|shoe review|album|single|song|music release|beatles|messi|ronaldo|f[uú]tbol|honda|vento ovni|motocicleta|moto 125/i.test(t))return false;
   if(/ovni|extraterrest|alien|reptilian|non[- ]human|unidentified anomal|unidentified flying|fen[oó]men[^ ]* an[oó]mal|aaro|grusch|disclosure/i.test(t))return true;
   if(/\b(ufo|uap|nhi)\b/i.test(t)&&/pentagon|nasa|military|congress|government|classified|air force|space force|pilot|sighting|formation|craft|crash|whistleblower|hearing|intelligence|defense|phenomen/i.test(t))return true;
   return false;
