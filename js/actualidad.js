@@ -6,8 +6,8 @@ function relDate(s){
 }
 function safeUrl(s=''){try{const u=new URL(s);return /^https?:$/.test(u.protocol)?u.href:'#'}catch{return'#'}}
 function newsCard(n,compact=false){
-  const image=n.image||'/assets/fallbacks/ovnis-3.svg';
-  return `<a class="live-news-card ${compact?'compact':''}" href="${safeUrl(n.url)}" target="_blank" rel="noopener"><div class="live-news-media"><img loading="lazy" src="${esc(image)}" onerror="this.onerror=null;this.src='/assets/fallbacks/ovnis-3.svg'" alt=""></div><div class="live-news-copy"><div class="live-card-top"><span class="live-dot"></span><span>${esc(n.source||'Fuente')}</span><time>${relDate(n.date)}</time></div><h3>${esc(n.title)}</h3><span class="live-arrow">Abrir fuente ↗</span></div></a>`;
+  if(!n.image)return'';
+  return `<a class="live-news-card ${compact?'compact':''}" href="${safeUrl(n.url)}" target="_blank" rel="noopener"><div class="live-news-media"><img loading="lazy" src="${esc(n.image)}" onerror="this.onerror=null;this.closest('.live-news-card')?.remove()" alt=""></div><div class="live-news-copy"><div class="live-card-top"><span class="live-dot"></span><span>${esc(n.source||'Fuente')}</span><time>${relDate(n.date)}</time></div><h3>${esc(n.title)}</h3><span class="live-arrow">Abrir fuente ↗</span></div></a>`;
 }
 function channelCard(c,compact=false){
   const latest=c.latestVideo||{},image=latest.thumbnail||c.cover,title=latest.title||c.name;
@@ -24,7 +24,7 @@ function mountChannelPlayers(root=document){
   });
 }
 async function getActualidad(){
-  const r=await fetch('/api/actualidad?rev=20261005-2300',{headers:{accept:'application/json'}});
+  const r=await fetch('/api/actualidad?rev=20261005-2304',{headers:{accept:'application/json'}});
   if(!r.ok)throw new Error('Actualidad '+r.status);return r.json();
 }
 async function renderActualidadPage(){
