@@ -1,8 +1,10 @@
 const CHANNELS=[
+  {id:'UC6ffFUtT43XHlccQbyWsNHA',handle:'jaimemaussanoficial',name:'Jaime Maussan / Maussan Televisión',lang:'ES',cover:'/assets/fallbacks/ovnis-1.svg'},
+  {id:'UCcbUuPjp7J32YSIESrUe76A',handle:'VMGranmisterio',name:'VM Granmisterio',lang:'ES',cover:'/assets/fallbacks/cosmos-3.svg'},
+  {id:'UCnOAynBmYKA1neozHQNF0mA',handle:'MundoDesconocido',name:'Mundo Desconocido',lang:'ES',cover:'/assets/fallbacks/misterio-2.svg'},
   {id:'UCIFk2uvCNcEmZ77g0ESKLcQ',handle:'TheWhyFiles',name:'The Why Files',lang:'EN',cover:'/assets/fallbacks/misterio-1.svg'},
   {id:'UCkgPT7LeB_t1aXTYyMiFVAg',handle:'JeremyCorbell',name:'Jeremy Corbell / WEAPONIZED',lang:'EN',cover:'/assets/fallbacks/ovnis-2.svg'},
-  {id:'UCCjG8NtOig0USdrT5D1FpxQ',handle:'NewsNation',name:'NewsNation',lang:'EN',cover:'/assets/fallbacks/ciencia-2.svg'},
-  {id:'UCcbUuPjp7J32YSIESrUe76A',handle:'VMGranmisterio',name:'VM Granmisterio',lang:'ES',cover:'/assets/fallbacks/cosmos-3.svg'}
+  {id:'UCCjG8NtOig0USdrT5D1FpxQ',handle:'NewsNation',name:'NewsNation',lang:'EN',cover:'/assets/fallbacks/ciencia-2.svg'}
 ].map(c=>({...c,playlist:'UU'+c.id.slice(2),url:'https://www.youtube.com/@'+c.handle}));
 
 const NEWS_FEEDS=[
