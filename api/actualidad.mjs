@@ -54,10 +54,42 @@ function metaImage(html=''){
   for(const p of patterns){const m=html.match(p);if(m?.[1])return decodeXml(m[1])}
   return'';
 }
+async function decodeGoogleNewsUrl(sourceUrl){
+  try{
+    const u=new URL(sourceUrl),parts=u.pathname.split('/').filter(Boolean);
+    if(u.hostname!=='news.google.com'||parts.at(-2)!=='articles')return sourceUrl;
+    const id=parts.at(-1);
+    const raw=Buffer.from(id.replace(/-/g,'+').replace(/_/g,'/'),'base64');
+    let str=raw.toString('binary');
+    const prefix=Buffer.from([0x08,0x13,0x22]).toString('binary');
+    const suffix=Buffer.from([0xd2,0x01,0x00]).toString('binary');
+    if(str.startsWith(prefix))str=str.slice(prefix.length);
+    if(str.endsWith(suffix))str=str.slice(0,-suffix.length);
+    const bytes=Uint8Array.from(str,ch=>ch.charCodeAt(0));
+    const len=bytes[0]||0;
+    str=len>=0x80?str.substring(2,len+2):str.substring(1,len+1);
+    if(!str.startsWith('AU_yqL')&&/^https?:\/\//.test(str))return str;
+    const req='[[["Fbv4je","[\\\"garturlreq\\\",[[\\\"en-US\\\",\\\"US\\\",[\\\"FINANCE_TOP_INDICES\\\",\\\"WEB_TEST_1_0_0\\\"],null,null,1,1,\\\"US:en\\\",null,180,null,null,null,null,null,0,null,null,[1608992183,723341000]],\\\"en-US\\\",\\\"US\\\",1,[2,3,4,8],1,0,\\\"655000234\\\",0,0,null,0],\\\"'+id+'\\\"]",null,"generic"]]]';
+    const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),4200);
+    try{
+      const res=await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je',{
+        method:'POST',signal:ctrl.signal,
+        headers:{'Content-Type':'application/x-www-form-urlencoded;charset=utf-8','Referer':'https://news.google.com/'},
+        body:'f.req='+encodeURIComponent(req)
+      });
+      const txt=await res.text(),header='[\\\"garturlres\\\",\\\"',footer='\\\",';
+      const ix=txt.indexOf(header);if(ix<0)return sourceUrl;
+      const rest=txt.slice(ix+header.length),end=rest.indexOf(footer);if(end<0)return sourceUrl;
+      const encoded=rest.slice(0,end);
+      try{return JSON.parse('"'+encoded.replace(/"/g,'\\\"')+'"')}catch{return encoded.replace(/\\u003d/g,'=').replace(/\\u0026/g,'&').replace(/\\\//g,'/')}
+    }finally{clearTimeout(timer)}
+  }catch{return sourceUrl}
+}
 async function enrichNews(n){
   try{
-    const r=await getText(n.url,4200);
-    return {...n,url:r.url||n.url,image:metaImage(r.text)||''};
+    const publisher=await decodeGoogleNewsUrl(n.url);
+    const r=await getText(publisher,4800);
+    return {...n,url:r.url||publisher||n.url,image:metaImage(r.text)||''};
   }catch{return {...n,image:''}}
 }
 function jsonText(s=''){
