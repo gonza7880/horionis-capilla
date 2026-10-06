@@ -56,35 +56,66 @@ function metaImage(html=''){
 }
 async function decodeGoogleNewsUrl(sourceUrl){
   try{
-    const u=new URL(sourceUrl),parts=u.pathname.split('/').filter(Boolean);
-    if(u.hostname!=='news.google.com'||parts.at(-2)!=='articles')return sourceUrl;
-    const id=parts.at(-1);
-    const raw=Buffer.from(id.replace(/-/g,'+').replace(/_/g,'/'),'base64');
-    let str=raw.toString('binary');
-    const prefix=Buffer.from([0x08,0x13,0x22]).toString('binary');
-    const suffix=Buffer.from([0xd2,0x01,0x00]).toString('binary');
-    if(str.startsWith(prefix))str=str.slice(prefix.length);
-    if(str.endsWith(suffix))str=str.slice(0,-suffix.length);
-    const bytes=Uint8Array.from(str,ch=>ch.charCodeAt(0));
-    const len=bytes[0]||0;
-    str=len>=0x80?str.substring(2,len+2):str.substring(1,len+1);
-    if(!str.startsWith('AU_yqL')&&/^https?:\/\//.test(str))return str;
-    const req='[[["Fbv4je","[\\\"garturlreq\\\",[[\\\"en-US\\\",\\\"US\\\",[\\\"FINANCE_TOP_INDICES\\\",\\\"WEB_TEST_1_0_0\\\"],null,null,1,1,\\\"US:en\\\",null,180,null,null,null,null,null,0,null,null,[1608992183,723341000]],\\\"en-US\\\",\\\"US\\\",1,[2,3,4,8],1,0,\\\"655000234\\\",0,0,null,0],\\\"'+id+'\\\"]",null,"generic"]]]';
-    const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),4200);
+    const u=new URL(sourceUrl),m=u.pathname.match(/\/(?:articles|read)\/([^/?]+)/);
+    if(u.hostname!=='news.google.com'||!m)return sourceUrl;
+    const articleId=m[1];
+    const headers={
+      'user-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+      'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'accept-language':'en-US,en;q=0.9',
+      'cookie':'CONSENT=PENDING+987'
+    };
+    const ctrl1=new AbortController(),t1=setTimeout(()=>ctrl1.abort(),4200);
+    let html='';
     try{
-      const res=await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je',{
-        method:'POST',signal:ctrl.signal,
-        headers:{'Content-Type':'application/x-www-form-urlencoded;charset=utf-8','Referer':'https://news.google.com/'},
-        body:'f.req='+encodeURIComponent(req)
+      const page=await fetch('https://news.google.com/articles/'+articleId,{signal:ctrl1.signal,headers});
+      if(!page.ok)return sourceUrl;html=await page.text();
+    }finally{clearTimeout(t1)}
+    const sig=(html.match(/data-n-a-sg="([^"]+)"/)||[])[1];
+    const ts=(html.match(/data-n-a-ts="([^"]+)"/)||[])[1];
+    if(!sig||!ts)return sourceUrl;
+    const inner=JSON.stringify([
+      'garturlreq',
+      [['X','X',['X','X'],null,null,1,1,'US:en',null,1,null,null,null,null,null,0,1],'X','X',1,[1,1,1],1,1,null,0,0,null,0],
+      articleId,Number(ts),sig
+    ]);
+    const payload=JSON.stringify([[['Fbv4je',inner]]]);
+    const ctrl2=new AbortController(),t2=setTimeout(()=>ctrl2.abort(),4200);
+    try{
+      const res=await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute',{
+        method:'POST',signal:ctrl2.signal,
+        headers:{
+          'user-agent':headers['user-agent'],'accept':'*/*','accept-language':'en-US,en;q=0.9',
+          'content-type':'application/x-www-form-urlencoded;charset=UTF-8',
+          'origin':'https://news.google.com','referer':'https://news.google.com/','x-same-domain':'1',
+          'cookie':'CONSENT=PENDING+987'
+        },
+        body:'f.req='+encodeURIComponent(payload)
       });
-      const txt=await res.text(),header='[\\\"garturlres\\\",\\\"',footer='\\\",';
-      const ix=txt.indexOf(header);if(ix<0)return sourceUrl;
-      const rest=txt.slice(ix+header.length),end=rest.indexOf(footer);if(end<0)return sourceUrl;
-      const encoded=rest.slice(0,end);
-      try{return JSON.parse('"'+encoded.replace(/"/g,'\\\"')+'"')}catch{return encoded.replace(/\\u003d/g,'=').replace(/\\u0026/g,'&').replace(/\\\//g,'/')}
-    }finally{clearTimeout(timer)}
+      if(!res.ok)return sourceUrl;
+      const txt=await res.text();
+      const marker='[\\\"garturlres\\\",\\\"';
+      const i=txt.indexOf(marker);
+      if(i>=0){
+        const rest=txt.slice(i+marker.length),j=rest.indexOf('\\\",');
+        if(j>=0){
+          const encoded=rest.slice(0,j);
+          try{return JSON.parse('"'+encoded.replace(/"/g,'\\\"')+'"')}catch{return encoded.replace(/\\u003d/g,'=').replace(/\\u0026/g,'&').replace(/\\\//g,'/')}
+        }
+      }
+      const chunks=txt.split('\n\n');
+      const jsonText=chunks.at(-1)?.trim();
+      if(jsonText){
+        try{
+          const parsed=JSON.parse(jsonText),innerJson=parsed?.[0]?.[2],innerParsed=innerJson?JSON.parse(innerJson):null;
+          const decoded=innerParsed?.[1];if(typeof decoded==='string'&&/^https?:\/\//.test(decoded))return decoded;
+        }catch{}
+      }
+      return sourceUrl;
+    }finally{clearTimeout(t2)}
   }catch{return sourceUrl}
 }
+
 async function enrichNews(n){
   try{
     const publisher=await decodeGoogleNewsUrl(n.url);
