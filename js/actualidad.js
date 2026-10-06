@@ -6,17 +6,20 @@ function relDate(s){
 }
 function safeUrl(s=''){try{const u=new URL(s);return /^https?:$/.test(u.protocol)?u.href:'#'}catch{return'#'}}
 function newsCard(n,compact=false){
-  return `<a class="live-news-card ${compact?'compact':''}" href="${safeUrl(n.url)}" target="_blank" rel="noopener"><div class="live-card-top"><span class="live-dot"></span><span>${esc(n.source||'Fuente')}</span><time>${relDate(n.date)}</time></div><h3>${esc(n.title)}</h3><span class="live-arrow">Abrir fuente ↗</span></a>`;
+  const image=n.image||'/assets/fallbacks/ovnis-3.svg';
+  return `<a class="live-news-card ${compact?'compact':''}" href="${safeUrl(n.url)}" target="_blank" rel="noopener"><div class="live-news-media"><img loading="lazy" src="${esc(image)}" onerror="this.onerror=null;this.src='/assets/fallbacks/ovnis-3.svg'" alt=""></div><div class="live-news-copy"><div class="live-card-top"><span class="live-dot"></span><span>${esc(n.source||'Fuente')}</span><time>${relDate(n.date)}</time></div><h3>${esc(n.title)}</h3><span class="live-arrow">Abrir fuente ↗</span></div></a>`;
 }
 function channelCard(c,compact=false){
-  return `<article class="live-video-card live-channel-card ${compact?'compact':''}" data-playlist="${esc(c.playlist)}"><button class="live-video-hit" type="button" aria-label="Ver últimos videos de ${esc(c.name)}"><div class="live-video-media"><img loading="lazy" src="${esc(c.cover)}" alt=""><span class="live-play">▶</span><span class="live-lang">${esc(c.lang||'')}</span><span class="live-channel-live">ÚLTIMOS VIDEOS</span></div><div class="live-video-copy"><div class="live-card-top"><span class="live-dot"></span><span>Canal seleccionado</span></div><h3>${esc(c.name)}</h3><span class="live-arrow">Abrir canal en Horionis →</span></div></button></article>`;
+  const latest=c.latestVideo||{},image=latest.thumbnail||c.cover,title=latest.title||c.name;
+  return `<article class="live-video-card live-channel-card ${compact?'compact':''}" data-playlist="${esc(c.playlist)}" data-video="${esc(latest.id||'')}"><button class="live-video-hit" type="button" aria-label="Ver último video de ${esc(c.name)}"><div class="live-video-media"><img loading="lazy" src="${esc(image)}" onerror="this.onerror=null;this.src='${esc(c.cover)}'" alt=""><span class="live-play">▶</span><span class="live-lang">${esc(c.lang||'')}</span><span class="live-channel-live">ÚLTIMO VIDEO</span></div><div class="live-video-copy"><div class="live-card-top"><span class="live-dot"></span><span>${esc(c.name)}</span></div><h3>${esc(title)}</h3><span class="live-arrow">Reproducir en Horionis →</span></div></button></article>`;
 }
 function mountChannelPlayers(root=document){
   root.querySelectorAll('.live-channel-card[data-playlist]').forEach(card=>{
     const btn=card.querySelector('.live-video-hit');if(!btn||btn.dataset.ready)return;btn.dataset.ready='1';
     btn.addEventListener('click',()=>{
-      const list=card.dataset.playlist;if(!list)return;
-      card.innerHTML=`<div class="live-embed"><iframe src="https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(list)}&autoplay=1&rel=0" title="Últimos videos de YouTube" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
+      const list=card.dataset.playlist,id=card.dataset.video;if(!list&&!id)return;
+      const src=id?`https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?autoplay=1&rel=0&list=${encodeURIComponent(list||'')}`:`https://www.youtube-nocookie.com/embed/videoseries?list=${encodeURIComponent(list)}&autoplay=1&rel=0`;
+      card.innerHTML=`<div class="live-embed"><iframe src="${src}" title="Video de YouTube" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="lazy"></iframe></div>`;
     },{once:true});
   });
 }
