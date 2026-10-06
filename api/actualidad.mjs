@@ -21,7 +21,8 @@ function tag(block,name){
   return m?decodeXml(m[1].trim()):'';
 }
 function attr(block,name,attrName){
-  const m=block.match(new RegExp('<'+name+'[^>]*\\s'+attrName+'=["\\']([^"\\']+)["\\'][^>]*>','i'));
+  const pattern=`<${name}[^>]*\\s${attrName}=["']([^"']+)["'][^>]*>`;
+  const m=block.match(new RegExp(pattern,'i'));
   return m?decodeXml(m[1]):'';
 }
 function parseNews(xml){
