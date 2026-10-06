@@ -36,17 +36,57 @@ function relevant(n){
   if(/\b(ufo|uap|nhi)\b/i.test(t)&&/pentagon|nasa|military|congress|government|classified|air force|space force|pilot|sighting|formation|craft|crash|whistleblower|hearing|intelligence|defense|phenomen/i.test(t))return true;
   return false;
 }
-async function getText(url){
-  const r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 HorionisActualidad/1.0','Accept':'application/rss+xml,text/xml,*/*'}});
-  if(!r.ok)throw new Error('Upstream '+r.status);
-  return r.text();
+async function getText(url,timeout=5000){
+  const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),timeout);
+  try{
+    const r=await fetch(url,{redirect:'follow',signal:ctrl.signal,headers:{'User-Agent':'Mozilla/5.0 HorionisActualidad/1.0','Accept':'text/html,application/rss+xml,text/xml,*/*'}});
+    if(!r.ok)throw new Error('Upstream '+r.status);
+    return {text:await r.text(),url:r.url};
+  }finally{clearTimeout(timer)}
+}
+function metaImage(html=''){
+  const patterns=[
+    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i,
+    /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i
+  ];
+  for(const p of patterns){const m=html.match(p);if(m?.[1])return decodeXml(m[1])}
+  return'';
+}
+async function enrichNews(n){
+  try{
+    const r=await getText(n.url,4200);
+    return {...n,url:r.url||n.url,image:metaImage(r.text)||''};
+  }catch{return {...n,image:''}}
+}
+function jsonText(s=''){
+  try{return JSON.parse('"'+s+'"')}catch{return s.replace(/\\u0026/g,'&').replace(/\\n/g,' ').replace(/\\\"/g,'"')}
+}
+async function enrichChannel(c){
+  try{
+    const r=await getText(c.url+'/videos',5000);
+    const html=r.text||'';
+    const m=html.match(/"videoId":"([^"]+)"/);
+    if(!m)return c;
+    const id=m[1],i=html.indexOf('"videoId":"'+id+'"');
+    const after=html.slice(i,Math.min(html.length,i+9000));
+    const tm=after.match(/"lockupMetadataViewModel":\{"title":\{"content":"((?:\\.|[^"\\])*)"/);
+    const title=tm?.[1]?jsonText(tm[1]):('Último video de '+c.name);
+    return {...c,latestVideo:{id,title,thumbnail:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',url:'https://www.youtube.com/watch?v='+id}};
+  }catch{return c}
 }
 
 export async function GET(){
-  const settled=await Promise.allSettled(NEWS_FEEDS.map(getText));
-  let news=settled.flatMap(r=>r.status==='fulfilled'?parseNews(r.value):[]).filter(relevant);
+  const [newsSettled,channelSettled]=await Promise.all([
+    Promise.allSettled(NEWS_FEEDS.map(u=>getText(u,4500).then(r=>r.text))),
+    Promise.allSettled(CHANNELS.map(enrichChannel))
+  ]);
+  let news=newsSettled.flatMap(r=>r.status==='fulfilled'?parseNews(r.value):[]).filter(relevant);
   news=dedupe(news,x=>x.title.toLowerCase().replace(/\s+/g,' ').trim()).sort((a,b)=>time(b)-time(a)).slice(0,18);
-  return new Response(JSON.stringify({generatedAt:new Date().toISOString(),news,channels:CHANNELS}),{
+  const enriched=await Promise.all(news.map(enrichNews));
+  const channels=channelSettled.map((r,i)=>r.status==='fulfilled'?r.value:CHANNELS[i]);
+  return new Response(JSON.stringify({generatedAt:new Date().toISOString(),news:enriched,channels}),{
     status:200,
     headers:{'content-type':'application/json; charset=utf-8','cache-control':'public, s-maxage=1800, stale-while-revalidate=21600','access-control-allow-origin':'*'}
   });
