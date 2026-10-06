@@ -10,7 +10,7 @@ function newsCard(n,compact=false){
   return `<a class="live-news-card ${compact?'compact':''}" href="${safeUrl(n.url)}" target="_blank" rel="noopener"><div class="live-news-media"><img loading="lazy" src="${esc(n.image)}" onerror="this.onerror=null;this.closest('.live-news-card')?.remove()" alt=""></div><div class="live-news-copy"><div class="live-card-top"><span class="live-dot"></span><span>${esc(n.source||'Fuente')}</span><time>${relDate(n.date)}</time></div><h3>${esc(n.title)}</h3><span class="live-arrow">Abrir fuente ↗</span></div></a>`;
 }
 function channelCard(c,compact=false){
-  const latest=c.latestVideo||{},image=latest.thumbnail||c.cover,title=latest.title||c.name;
+  const latest=c.latestVideo||{};if(!latest.id||!latest.thumbnail)return'';const image=latest.thumbnail,title=latest.title||c.name;
   return `<article class="live-video-card live-channel-card ${compact?'compact':''}" data-playlist="${esc(c.playlist)}" data-video="${esc(latest.id||'')}"><button class="live-video-hit" type="button" aria-label="Ver último video de ${esc(c.name)}"><div class="live-video-media"><img loading="lazy" src="${esc(image)}" onerror="this.onerror=null;this.src='${esc(c.cover)}'" alt=""><span class="live-play">▶</span><span class="live-lang">${esc(c.lang||'')}</span><span class="live-channel-live">ÚLTIMO VIDEO</span></div><div class="live-video-copy"><div class="live-card-top"><span class="live-dot"></span><span>${esc(c.name)}</span></div><h3>${esc(title)}</h3><span class="live-arrow">Reproducir en Horionis →</span></div></button></article>`;
 }
 function mountChannelPlayers(root=document){
@@ -24,7 +24,7 @@ function mountChannelPlayers(root=document){
   });
 }
 async function getActualidad(){
-  const r=await fetch('/api/actualidad?rev=20261005-2304',{headers:{accept:'application/json'}});
+  const r=await fetch('/api/actualidad?rev=20261005-2307',{headers:{accept:'application/json'}});
   if(!r.ok)throw new Error('Actualidad '+r.status);return r.json();
 }
 async function renderActualidadPage(){
