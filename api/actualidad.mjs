@@ -139,7 +139,7 @@ function youtubePairs(html=''){
   return out;
 }
 function uapVideo(title=''){
-  return /\b(ufo|uap|ovni|nhi|aaro)\b|alien|extraterrest|reptilian|non[- ]human|spacecraft|martian|mars|area 51|grusch|disclosure|declassif|anomalous|orb|sighting|unidentified|pentagon.*(ufo|uap)|nasa.*(ufo|uap|alien)/i.test(title);
+  return /\b(ufo|uap|ovni|nhi|aaro)\b|alien|extraterrest|reptilian|non[- ]human|spacecraft|martian|mars|area 51|grusch|disclosure|declassif|anomalous|\borbs?\b|sighting|unidentified|pentagon.*(ufo|uap)|nasa.*(ufo|uap|alien)/i.test(title);
 }
 async function enrichChannel(c){
   try{
