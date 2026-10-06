@@ -36,10 +36,15 @@ function relevant(n){
   if(/\b(ufo|uap|nhi)\b/i.test(t)&&/pentagon|nasa|military|congress|government|classified|air force|space force|pilot|sighting|formation|craft|crash|whistleblower|hearing|intelligence|defense|phenomen/i.test(t))return true;
   return false;
 }
-async function getText(url,timeout=5000){
+const BROWSER_HEADERS={
+  'user-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+  'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,application/rss+xml,text/xml,*/*;q=0.8',
+  'accept-language':'es-419,es;q=0.9,en;q=0.8'
+};
+async function getText(url,timeout=5000,extraHeaders={}){
   const ctrl=new AbortController();const timer=setTimeout(()=>ctrl.abort(),timeout);
   try{
-    const r=await fetch(url,{redirect:'follow',signal:ctrl.signal,headers:{'User-Agent':'Mozilla/5.0 HorionisActualidad/1.0','Accept':'text/html,application/rss+xml,text/xml,*/*'}});
+    const r=await fetch(url,{redirect:'follow',signal:ctrl.signal,headers:{...BROWSER_HEADERS,...extraHeaders}});
     if(!r.ok)throw new Error('Upstream '+r.status);
     return {text:await r.text(),url:r.url};
   }finally{clearTimeout(timer)}
@@ -49,79 +54,97 @@ function metaImage(html=''){
     /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i,
     /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
-    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i,
+    /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+itemprop=["']image["']/i,
+    /<link[^>]+rel=["']preload["'][^>]+as=["']image["'][^>]+href=["']([^"']+)["']/i,
+    /<link[^>]+href=["']([^"']+)["'][^>]+as=["']image["'][^>]+rel=["']preload["']/i
   ];
   for(const p of patterns){const m=html.match(p);if(m?.[1])return decodeXml(m[1])}
   return'';
 }
-async function decodeGoogleNewsUrl(sourceUrl){
+function googleArticleId(sourceUrl=''){
   try{
-    const u=new URL(sourceUrl),m=u.pathname.match(/\/(?:articles|read)\/([^/?]+)/);
-    if(u.hostname!=='news.google.com'||!m)return sourceUrl;
-    const articleId=m[1];
-    const headers={
-      'user-agent':'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-      'accept':'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    const u=new URL(sourceUrl),m=u.pathname.match(/\/(?:rss\/)?(?:articles|read)\/([^/?]+)/);
+    return u.hostname==='news.google.com'&&m?m[1]:'';
+  }catch{return''}
+}
+async function googleDecodeParams(sourceUrl,index){
+  const id=googleArticleId(sourceUrl);if(!id)return null;
+  try{
+    const r=await getText('https://news.google.com/rss/articles/'+id,4200,{
       'accept-language':'en-US,en;q=0.9',
-      'cookie':'CONSENT=PENDING+987'
-    };
-    const ctrl1=new AbortController(),t1=setTimeout(()=>ctrl1.abort(),4200);
-    let html='';
-    try{
-      const page=await fetch('https://news.google.com/articles/'+articleId,{signal:ctrl1.signal,headers});
-      if(!page.ok)return sourceUrl;html=await page.text();
-    }finally{clearTimeout(t1)}
-    const sig=(html.match(/data-n-a-sg="([^"]+)"/)||[])[1];
-    const ts=(html.match(/data-n-a-ts="([^"]+)"/)||[])[1];
-    if(!sig||!ts)return sourceUrl;
-    const inner=JSON.stringify([
-      'garturlreq',
-      [['X','X',['X','X'],null,null,1,1,'US:en',null,1,null,null,null,null,null,0,1],'X','X',1,[1,1,1],1,1,null,0,0,null,0],
-      articleId,Number(ts),sig
+      'referer':'https://news.google.com/'
+    });
+    const sig=(r.text.match(/data-n-a-sg=["']([^"']+)["']/)||[])[1];
+    const ts=(r.text.match(/data-n-a-ts=["']([^"']+)["']/)||[])[1];
+    return sig&&ts?{index,id,sig,ts:Number(ts)}:null;
+  }catch{return null}
+}
+async function decodeGoogleNewsBatch(items){
+  const settled=await Promise.allSettled(items.map((n,i)=>googleDecodeParams(n.url,i)));
+  const params=settled.flatMap(r=>r.status==='fulfilled'&&r.value?[r.value]:[]);
+  if(!params.length)return items.map(n=>({...n,publisherUrl:n.url}));
+  try{
+    const reqs=params.map(p=>[
+      'Fbv4je',
+      JSON.stringify([
+        'garturlreq',
+        [['X','X',['X','X'],null,null,1,1,'US:en',null,1,null,null,null,null,null,0,1],'X','X',1,[1,1,1],1,1,null,0,0,null,0],
+        p.id,p.ts,p.sig
+      ])
     ]);
-    const payload=JSON.stringify([[['Fbv4je',inner]]]);
-    const ctrl2=new AbortController(),t2=setTimeout(()=>ctrl2.abort(),4200);
+    const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),6500);
+    let txt='';
     try{
       const res=await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute',{
-        method:'POST',signal:ctrl2.signal,
+        method:'POST',signal:ctrl.signal,
         headers:{
-          'user-agent':headers['user-agent'],'accept':'*/*','accept-language':'en-US,en;q=0.9',
+          ...BROWSER_HEADERS,
+          'accept':'*/*',
+          'accept-language':'en-US,en;q=0.9',
           'content-type':'application/x-www-form-urlencoded;charset=UTF-8',
-          'origin':'https://news.google.com','referer':'https://news.google.com/','x-same-domain':'1',
-          'cookie':'CONSENT=PENDING+987'
+          'origin':'https://news.google.com',
+          'referer':'https://news.google.com/',
+          'x-same-domain':'1'
         },
-        body:'f.req='+encodeURIComponent(payload)
+        body:'f.req='+encodeURIComponent(JSON.stringify([reqs]))
       });
-      if(!res.ok)return sourceUrl;
-      const txt=await res.text();
-      const marker='[\\\"garturlres\\\",\\\"';
-      const i=txt.indexOf(marker);
-      if(i>=0){
-        const rest=txt.slice(i+marker.length),j=rest.indexOf('\\\",');
-        if(j>=0){
-          const encoded=rest.slice(0,j);
-          try{return JSON.parse('"'+encoded.replace(/"/g,'\\\"')+'"')}catch{return encoded.replace(/\\u003d/g,'=').replace(/\\u0026/g,'&').replace(/\\\//g,'/')}
-        }
-      }
-      const chunks=txt.split('\n\n');
-      const jsonText=chunks.at(-1)?.trim();
-      if(jsonText){
-        try{
-          const parsed=JSON.parse(jsonText),innerJson=parsed?.[0]?.[2],innerParsed=innerJson?JSON.parse(innerJson):null;
-          const decoded=innerParsed?.[1];if(typeof decoded==='string'&&/^https?:\/\//.test(decoded))return decoded;
-        }catch{}
-      }
-      return sourceUrl;
-    }finally{clearTimeout(t2)}
-  }catch{return sourceUrl}
+      if(!res.ok)throw new Error('Google decode '+res.status);
+      txt=await res.text();
+    }finally{clearTimeout(timer)}
+    let rows=[];
+    for(const chunk of txt.split('\n\n')){
+      try{
+        const parsed=JSON.parse(chunk.trim());
+        if(Array.isArray(parsed)&&parsed.some(row=>Array.isArray(row)&&typeof row[2]==='string')){rows=parsed;break}
+      }catch{}
+    }
+    const urls=rows.flatMap(row=>{
+      if(!Array.isArray(row)||typeof row[2]!=='string')return[];
+      try{
+        const inner=JSON.parse(row[2]),url=inner?.[1];
+        return typeof url==='string'&&/^https?:\/\//.test(url)?[url]:[];
+      }catch{return[]}
+    });
+    const decoded=new Map();
+    params.forEach((p,i)=>{if(urls[i])decoded.set(p.index,urls[i])});
+    return items.map((n,i)=>({...n,publisherUrl:decoded.get(i)||n.url}));
+  }catch{
+    return items.map(n=>({...n,publisherUrl:n.url}));
+  }
 }
-
 async function enrichNews(n){
+  const candidate=n.publisherUrl||n.url;
   try{
-    const publisher=await decodeGoogleNewsUrl(n.url);
-    const r=await getText(publisher,4800);
-    return {...n,url:r.url||publisher||n.url,image:metaImage(r.text)||''};
-  }catch{return {...n,image:''}}
+    const first=await getText(candidate,5200);
+    const finalUrl=first.url||candidate;
+    const host=(()=>{try{return new URL(finalUrl).hostname}catch{return''}})();
+    if(host==='news.google.com'){
+      return {...n,url:n.url,image:''};
+    }
+    return {...n,url:finalUrl,image:metaImage(first.text)||''};
+  }catch{return {...n,url:candidate,image:''}}
 }
 function jsonText(s=''){
   try{return JSON.parse('"'+s+'"')}catch{return s.replace(/\\u0026/g,'&').replace(/\\n/g,' ').replace(/\\\"/g,'"')}
@@ -143,13 +166,16 @@ function uapVideo(title=''){
 }
 async function enrichChannel(c){
   try{
-    const r=await getText(c.url+'/videos',5000);
+    const isEs=c.lang==='ES';
+    const locale=isEs?'?hl=es&gl=AR':'?hl=en&gl=US';
+    const langHeaders={'accept-language':isEs?'es-419,es;q=0.9,en;q=0.8':'en-US,en;q=0.9'};
+    const r=await getText(c.url+'/videos'+locale,5000,langHeaders);
     let pairs=youtubePairs(r.text||'');
     let chosen=pairs.find(v=>uapVideo(v.title));
     if(!chosen&&c.handle==='NewsNation'){
       try{
-        const s=await getText(c.url+'/search?query=UAP',4500);
-        pairs=youtubePairs(s.text||'');
+        const sr=await getText(c.url+'/search?query=UAP&hl=en&gl=US',4500,{'accept-language':'en-US,en;q=0.9'});
+        pairs=youtubePairs(sr.text||'');
         chosen=pairs.find(v=>uapVideo(v.title))||pairs[0];
       }catch{}
     }
@@ -166,7 +192,8 @@ export async function GET(){
   ]);
   let news=newsSettled.flatMap(r=>r.status==='fulfilled'?parseNews(r.value):[]).filter(relevant);
   news=dedupe(news,x=>x.title.toLowerCase().replace(/\s+/g,' ').trim()).sort((a,b)=>time(b)-time(a)).slice(0,18);
-  const enriched=await Promise.all(news.map(enrichNews));
+  const decodedNews=await decodeGoogleNewsBatch(news);
+  const enriched=await Promise.all(decodedNews.map(enrichNews));
   const channels=channelSettled.map((r,i)=>r.status==='fulfilled'?r.value:CHANNELS[i]);
   return new Response(JSON.stringify({generatedAt:new Date().toISOString(),news:enriched,channels}),{
     status:200,
