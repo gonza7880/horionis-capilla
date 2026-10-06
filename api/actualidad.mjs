@@ -28,7 +28,11 @@ function parseNews(xml){
 function time(x){const t=Date.parse(x.date||'');return Number.isFinite(t)?t:0}
 function dedupe(items,keyFn){const seen=new Set();return items.filter(x=>{const k=keyFn(x);if(seen.has(k))return false;seen.add(k);return true})}
 function relevant(n){
-  return /\b(ufo|uap|ovni|aaro|nhi)\b|alien|extraterrest|reptilian|non[- ]human|unidentified anomal|fen[oó]men[^ ]* an[oó]mal|grusch|disclosure|whistleblower.*ufo|pentagon.*ufo|nasa.*ufo/i.test(n.title);
+  const t=n.title||'';
+  if(/nasdaq|etf|stock|shares|investor|running shoe|shoe review|album|single|song|music release/i.test(t))return false;
+  if(/ovni|extraterrest|alien|reptilian|non[- ]human|unidentified anomal|unidentified flying|fen[oó]men[^ ]* an[oó]mal|aaro|grusch|disclosure/i.test(t))return true;
+  if(/\b(ufo|uap|nhi)\b/i.test(t)&&/pentagon|nasa|military|congress|government|classified|air force|space force|pilot|sighting|formation|craft|crash|whistleblower|hearing|intelligence|defense|phenomen/i.test(t))return true;
+  return false;
 }
 async function getText(url){
   const r=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 HorionisActualidad/1.0','Accept':'application/rss+xml,text/xml,*/*'}});
