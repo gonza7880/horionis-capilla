@@ -187,7 +187,7 @@ export async function GET(){
   ]);
   let news=newsSettled.flatMap(r=>r.status==='fulfilled'?parseNews(r.value):[]).filter(relevant);
   news=dedupe(news,x=>x.title.toLowerCase().replace(/\s+/g,' ').trim()).sort((a,b)=>time(b)-time(a)).slice(0,18);
-  const enriched=await mapLimit(news,6,enrichNews);
+  const enriched=(await mapLimit(news,6,enrichNews)).filter(n=>n.image&&/^https?:\/\//i.test(n.image));
   const channels=channelSettled.map((r,i)=>r.status==='fulfilled'?r.value:CHANNELS[i]);
   return new Response(JSON.stringify({generatedAt:new Date().toISOString(),news:enriched,channels}),{
     status:200,
