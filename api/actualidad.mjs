@@ -63,17 +63,36 @@ async function enrichNews(n){
 function jsonText(s=''){
   try{return JSON.parse('"'+s+'"')}catch{return s.replace(/\\u0026/g,'&').replace(/\\n/g,' ').replace(/\\\"/g,'"')}
 }
+function youtubePairs(html=''){
+  const ids=[...html.matchAll(/"videoId":"([^"]+)"/g)].map(m=>m[1]);
+  const unique=[...new Set(ids)].slice(0,60),out=[];
+  for(const id of unique){
+    const i=html.indexOf('"videoId":"'+id+'"');if(i<0)continue;
+    const after=html.slice(i,Math.min(html.length,i+9000));
+    const tm=after.match(/"lockupMetadataViewModel":\{"title":\{"content":"((?:\\.|[^"\\])*)"/);
+    const title=tm?.[1]?jsonText(tm[1]):'';
+    if(title)out.push({id,title});
+  }
+  return out;
+}
+function uapVideo(title=''){
+  return /\b(ufo|uap|ovni|nhi|aaro)\b|alien|extraterrest|reptilian|non[- ]human|spacecraft|martian|mars|area 51|grusch|disclosure|declassif|anomalous|orb|sighting|unidentified|pentagon.*(ufo|uap)|nasa.*(ufo|uap|alien)/i.test(title);
+}
 async function enrichChannel(c){
   try{
     const r=await getText(c.url+'/videos',5000);
-    const html=r.text||'';
-    const m=html.match(/"videoId":"([^"]+)"/);
-    if(!m)return c;
-    const id=m[1],i=html.indexOf('"videoId":"'+id+'"');
-    const after=html.slice(i,Math.min(html.length,i+9000));
-    const tm=after.match(/"lockupMetadataViewModel":\{"title":\{"content":"((?:\\.|[^"\\])*)"/);
-    const title=tm?.[1]?jsonText(tm[1]):('Último video de '+c.name);
-    return {...c,latestVideo:{id,title,thumbnail:'https://i.ytimg.com/vi/'+id+'/hqdefault.jpg',url:'https://www.youtube.com/watch?v='+id}};
+    let pairs=youtubePairs(r.text||'');
+    let chosen=pairs.find(v=>uapVideo(v.title));
+    if(!chosen&&c.handle==='NewsNation'){
+      try{
+        const s=await getText(c.url+'/search?query=UAP',4500);
+        pairs=youtubePairs(s.text||'');
+        chosen=pairs.find(v=>uapVideo(v.title))||pairs[0];
+      }catch{}
+    }
+    chosen=chosen||pairs[0];
+    if(!chosen)return c;
+    return {...c,latestVideo:{id:chosen.id,title:chosen.title,thumbnail:'https://i.ytimg.com/vi/'+chosen.id+'/hqdefault.jpg',url:'https://www.youtube.com/watch?v='+chosen.id}};
   }catch{return c}
 }
 
