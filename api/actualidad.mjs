@@ -55,6 +55,8 @@ function metaImage(html=''){
     /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image(?::secure_url)?["']/i,
     /<meta[^>]+name=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image(?::src)?["']/i,
+    /<meta[^>]+property=["']twitter:image(?::src)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']twitter:image(?::src)?["']/i,
     /<meta[^>]+itemprop=["']image["'][^>]+content=["']([^"']+)["']/i,
     /<meta[^>]+content=["']([^"']+)["'][^>]+itemprop=["']image["']/i,
     /<link[^>]+rel=["']preload["'][^>]+as=["']image["'][^>]+href=["']([^"']+)["']/i,
@@ -120,12 +122,13 @@ async function decodeGoogleNewsBatch(items){
         if(Array.isArray(parsed)&&parsed.some(row=>Array.isArray(row)&&typeof row[2]==='string')){rows=parsed;break}
       }catch{}
     }
-    const urls=rows.flatMap(row=>{
-      if(!Array.isArray(row)||typeof row[2]!=='string')return[];
+    const responseRows=rows.filter(row=>Array.isArray(row)&&row[1]==='Fbv4je').slice(0,params.length);
+    const urls=responseRows.map(row=>{
+      if(typeof row[2]!=='string')return null;
       try{
         const inner=JSON.parse(row[2]),url=inner?.[1];
-        return typeof url==='string'&&/^https?:\/\//.test(url)?[url]:[];
-      }catch{return[]}
+        return typeof url==='string'&&/^https?:\/\//.test(url)?url:null;
+      }catch{return null}
     });
     const decoded=new Map();
     params.forEach((p,i)=>{if(urls[i])decoded.set(p.index,urls[i])});
