@@ -8,11 +8,11 @@ function metaID(s){const m=s.match(/<link[^>]*rel="canonical"[^>]*href="https:\/
 export default async function handler(req,res){
  res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','public, s-maxage=180, stale-while-revalidate=180');
  if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
- let channelId=null,videoId=null,error=null;
+ let channelId='UC_YyE3hP8wZ2HNRz3IWNRFQ',videoId=null,error=null;
  try{
   const r=await fetchPage(ch+'/live');
   if(r.ok){
-   const html=await r.text();channelId=channelID(html);
+   const html=await r.text();channelId=channelID(html)||channelId;
    const redirected=liveID(r.url);
    const liveSignal=/"isLiveNow"\s*:\s*true|"isLive"\s*:\s*true|"isLiveContent"\s*:\s*true/.test(html);
    videoId=redirected||(liveSignal?metaID(html):null);

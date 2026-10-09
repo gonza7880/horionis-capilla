@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id),fallback='LskKW360XB4';
-const state={liveId:null,channelId:null,playing:false,type:null,id:null};
+const state={liveId:null,channelId:'UC_YyE3hP8wZ2HNRz3IWNRFQ',playing:false,type:null,id:null};
 function clock(){const f=new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit',hour12:false});$('uriClock').textContent=f.format(new Date())+' ART'}
 function status(name,side,active){$('uriStateText').textContent=name;$('uriSideState').textContent=side;$('uriLed').classList.toggle('active',!!active)}
 function start(type,id){
@@ -14,7 +14,7 @@ async function refresh(){
  try{
  const res=await fetch('/api/uritorco',{cache:'no-store'});if(!res.ok)throw Error('status '+res.status);const data=await res.json();
  state.liveId=/^[\w-]{11}$/.test(data.videoId||'')?data.videoId:null;
- state.channelId=/^UC[\w-]{20,}$/.test(data.channelId||'')?data.channelId:null;
+ state.channelId=/^UC[\w-]{20,}$/.test(data.channelId||'')?data.channelId:'UC_YyE3hP8wZ2HNRz3IWNRFQ';
  if(state.liveId){
  status('SEÑAL EN DIRECTO IDENTIFICADA','Emisión encontrada',true);
  $('uriHint').textContent='La señal está disponible. Iniciá el reproductor para observar el Uritorco dentro de Horionis.';
