@@ -1,23 +1,98 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "routes": [
-    {"src": "/api/actualidad/?", "dest": "/api/actualidad.mjs"},
-    {"src": "/wp-json/(.*)", "dest": "http://157.245.126.149/wp-json/$1"},
-    {"src": "/wp-content/(.*)", "dest": "http://157.245.126.149/wp-content/$1", "headers": {"Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000"}},
-    {"src": "/", "dest": "/index.html"},
-    {"src": "/actualidad/?", "dest": "/actualidad.html"},
-    {"src": "/archivo/?", "dest": "/archivo.html"},
-    {"src": "/documentales/?", "dest": "/documentales.html"},
-    {"src": "/sobre-horionis/?", "dest": "/sobre.html"},
-    {"src": "/contacto/?", "dest": "/contacto.html"},
-    {"src": "/favicon.svg", "dest": "/favicon.svg"},
-    {"src": "/robots.txt", "dest": "/robots.txt"},
-    {"src": "/sitemap.xml", "dest": "/sitemap.xml"},
-    {"src": "/site.webmanifest", "dest": "/site.webmanifest"},
-    {"src": "/assets/(.*)", "dest": "/assets/$1", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}},
-    {"src": "/css/(.*)", "dest": "/css/$1", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}},
-    {"src": "/js/(.*)", "dest": "/js/$1", "headers": {"Cache-Control": "public, max-age=31536000, immutable"}},
-    {"src": "/(?<slug>[^/.]+)/?", "dest": "/article.html?slug=$slug"},
-    {"src": "/.*", "dest": "/404.html", "status": 404}
+    {
+      "src": "/api/actualidad/?",
+      "dest": "/api/actualidad.mjs"
+    },
+    {
+      "src": "/api/uritorco/?",
+      "dest": "/api/uritorco.mjs"
+    },
+    {
+      "src": "/wp-json/(.*)",
+      "dest": "http://157.245.126.149/wp-json/$1"
+    },
+    {
+      "src": "/wp-content/(.*)",
+      "dest": "http://157.245.126.149/wp-content/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000"
+      }
+    },
+    {
+      "src": "/",
+      "dest": "/index.html"
+    },
+    {
+      "src": "/actualidad/?",
+      "dest": "/actualidad.html"
+    },
+    {
+      "src": "/uritorco-en-vivo/?",
+      "dest": "/uritorco-en-vivo.html"
+    },
+    {
+      "src": "/archivo/?",
+      "dest": "/archivo.html"
+    },
+    {
+      "src": "/documentales/?",
+      "dest": "/documentales.html"
+    },
+    {
+      "src": "/sobre-horionis/?",
+      "dest": "/sobre.html"
+    },
+    {
+      "src": "/contacto/?",
+      "dest": "/contacto.html"
+    },
+    {
+      "src": "/favicon.svg",
+      "dest": "/favicon.svg"
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "/robots.txt"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "/sitemap.xml"
+    },
+    {
+      "src": "/site.webmanifest",
+      "dest": "/site.webmanifest"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "/assets/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/css/(.*)",
+      "dest": "/css/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/js/(.*)",
+      "dest": "/js/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
+    },
+    {
+      "src": "/(?<slug>[^/.]+)/?",
+      "dest": "/article.html?slug=$slug"
+    },
+    {
+      "src": "/.*",
+      "dest": "/404.html",
+      "status": 404
+    }
   ]
 }
