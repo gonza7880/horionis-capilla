@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-const ORIGINAL_VIDEO_ID='pAA0ZsRf7SI';
+const ORIGINAL_VIDEO_ID='mwJEfabKc0w';
 const ORIGINAL_VIDEO_URL='https://www.youtube.com/watch?v='+ORIGINAL_VIDEO_ID;
 const CHANNEL_LIVE_URL='https://www.youtube.com/@MagiaDelMonte/live';
 const state={activeId:null,player:null,version:0,api:null,refreshing:false,hasError:false,endedIds:new Set()};
@@ -58,7 +58,7 @@ function fallbackIframe(id,version){
   if(version!==state.version)return;
   const iframe=document.createElement('iframe');
   iframe.src='https://www.youtube.com/embed/'+encodeURIComponent(id)+'?autoplay=1&mute=1&playsinline=1&rel=0';
-  iframe.title='Transmisión de Magia del Monte · Cerro Uritorco';
+  iframe.title='Transmisión Magia del Monte · Dique El Cajón, Capilla del Monte';
   iframe.allow='autoplay;encrypted-media;picture-in-picture;fullscreen';
   iframe.allowFullscreen=true;
   iframe.referrerPolicy='strict-origin-when-cross-origin';
@@ -75,7 +75,7 @@ async function play(id,reason='provided'){
   $('uriIntro').hidden=true;
   $('uriPlayerHost').hidden=false;
   $('uriPlayerHost').replaceChildren(Object.assign(document.createElement('div'),{id:'uriYoutubePlayer'}));
-  $('uriVideoLabel').textContent='CONECTANDO DIRECTO DE MAGIA DEL MONTE · SIN SONIDO';
+  $('uriVideoLabel').textContent='CONECTANDO CÁMARA DEL DIQUE EL CAJÓN · SIN SONIDO';
   status('CONECTANDO CON LA CÁMARA','Abriendo transmisión del canal',false);
   try{
     const YT=await youtubeApi();
@@ -92,8 +92,8 @@ async function play(id,reason='provided'){
         onStateChange:event=>{
           if(version!==state.version)return;
           if(event.data===YT.PlayerState.PLAYING){
-            status('SEÑAL REPRODUCIÉNDOSE','Cámara de Magia del Monte',true);
-            $('uriVideoLabel').textContent='● EN VIVO · MAGIA DEL MONTE · SIN SONIDO AL INICIAR';
+            status('SEÑAL REPRODUCIÉNDOSE','Dique El Cajón · Capilla del Monte',true);
+            $('uriVideoLabel').textContent='● TRANSMISIÓN MAGIA DEL MONTE · DIQUE EL CAJÓN · INICIO SIN SONIDO';
             $('uriSound').hidden=false;
             $('uriSound').textContent=state.player&&state.player.isMuted()?'♫ Activar sonido':'♫ Silenciar';
           }
@@ -125,7 +125,7 @@ async function refresh(){
     const data=await result.json();
     const newId=data.live===true&&isVideoId(data.videoId)?data.videoId:null;
     // Si YouTube no devuelve resultados para el canal NO significa que el enlace directo enviado por el usuario esté caído.
-    if(newId&&!state.endedIds.has(newId)&&newId!==state.activeId)await play(newId,'detected');
+    if(newId&&!state.activeId&&!state.endedIds.has(newId)&&!state.hasError)await play(newId,'detected');
     // Nunca reemplazar la emisión conocida por una grabación ni apagarla solo por ausencia de metadatos.
     if(!newId&&!state.activeId&&!state.hasError){
       status('BUSCANDO NUEVA SEÑAL','Esperando otro directo',false);
