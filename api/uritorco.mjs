@@ -1,192 +1,104 @@
-// Horionis · Descubrimiento del directo público de Magia del Monte.
-// No descargamos, almacenamos ni retransmitimos el contenido de YouTube.
-const CHANNEL_ID = 'UC_YyE3hP8wZ2HNRz3IWNRFQ';
-const CHANNEL = 'https://www.youtube.com/@MagiaDelMonte';
-const CHANNEL_LINK = CHANNEL + '/live';
-const RECENTLY_SHARED_VIDEO_ID = 'OyIJiYTY61g';
-// Esta referencia es un arranque temporal, NO una grabación fija ni un estado "en vivo" confirmado.
-// Expira para que Horionis no reproduzca una transmisión pasada.
-const RECENTLY_SHARED_UNTIL = Date.parse('2026-10-27T04:00:00Z');
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Accept-Language': 'es-AR,es;q=0.9,en;q=0.8',
-  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
-};
-const isId = x => typeof x === 'string' && /^[A-Za-z0-9_-]{11}$/.test(x);
-
-async function load(url, time=5600) {
-  const ctrl = new AbortController();
-  const timeout = setTimeout(()=>ctrl.abort(),time);
+// Horionis · Señal actual del canal @MagiaDelMonte vía YouTube Data API v3.
+// La clave vive únicamente en las variables de entorno de Vercel (YOUTUBE_API_KEY).
+// No se realizan búsquedas por scraping ni se reproducen grabaciones antiguas como vivos.
+const HANDLE = '@MagiaDelMonte';
+const CHANNEL_URL = 'https://www.youtube.com/@MagiaDelMonte/live';
+const DEFAULT_CHANNEL_ID = 'UC_YyE3hP8wZ2HNRz3IWNRFQ';
+const API_ROOT = 'https://www.googleapis.com/youtube/v3/';
+const isId = v => typeof v === 'string' && /^[A-Za-z0-9_-]{11}$/.test(v);
+function answer(res, status, extra={}) {
+  return res.status(200).json({
+    status,live:status==='live',videoId:null,channelUrl:CHANNEL_URL,
+    channelId:DEFAULT_CHANNEL_ID,checkedAt:new Date().toISOString(),...extra
+  });
+}
+async function request(method,params,key){
+  const url=new URL(API_ROOT+method);
+  for(const [k,v] of Object.entries({...params,key}))url.searchParams.set(k,String(v));
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),6000);
   try {
-    const r = await fetch(url,{headers:HEADERS,redirect:'follow',signal:ctrl.signal});
-    if (!r.ok) return null;
-    const text = await r.text();
-    return {text,finalUrl:r.url};
-  } catch (_) {return null}
-  finally {clearTimeout(timeout)}
-}
-function jsonObjectAfter(html, markers) {
-  for (const marker of markers) {
-    const markerAt = html.indexOf(marker);
-    if (markerAt < 0) continue;
-    const begin = html.indexOf('{',markerAt+marker.length);
-    if (begin<0 || begin-markerAt>90) continue;
-    let depth=0,quote=false,esc=false;
-    for(let i=begin;i<html.length;i++){
-      const c=html[i];
-      if(quote){
-        if(esc)esc=false;
-        else if(c==='\\')esc=true;
-        else if(c==='"')quote=false;
-      }else{
-        if(c==='"')quote=true;
-        else if(c==='{')depth++;
-        else if(c==='}' && --depth===0){
-          try{return JSON.parse(html.slice(begin,i+1))}catch(_){break}
-        }
-      }
+    const response=await fetch(url,{signal:controller.signal,headers:{Accept:'application/json'}});
+    const obj=await response.json();
+    if(!response.ok) {
+      const reason=obj.error?.errors?.[0]?.reason||obj.error?.status||'youtube_error';
+      throw new Error('YouTube API: '+reason);
     }
-  }
-  return null;
+    return obj;
+  } finally {clearTimeout(timer)}
 }
-function checkBroadcast(html,expectedId=null) {
-  if(!html) return {live:null,id:null};
-  const player=jsonObjectAfter(html,['var ytInitialPlayerResponse = ','ytInitialPlayerResponse = ','"ytInitialPlayerResponse":']);
-  if(!player) return {live:null,id:null};
-  const id=player.videoDetails?.videoId||expectedId;
-  if(expectedId && id && id!==expectedId)return {live:null,id:null};
-  const owner=player.videoDetails?.channelId;
-  if(owner && owner!==CHANNEL_ID)return {live:false,id:null};
-  const details=player.microformat?.playerMicroformatRenderer?.liveBroadcastDetails;
-  const flag=details?.isLiveNow;
-  if(flag === true) return {live:true,id,title:player.videoDetails?.title||null};
-  if(flag === false) return {live:false,id,title:player.videoDetails?.title||null};
-  if(player.videoDetails?.isLive === true && player.videoDetails?.isLiveContent === true)
-    return {live:true,id,title:player.videoDetails?.title||null};
-  return {live:null,id,title:player.videoDetails?.title||null};
+function activeVideo(v,channelId){
+  if(!v||!isId(v.id)||v.snippet?.channelId!==channelId)return false;
+  // Exactamente 'live': no confundir una premiere programada o una grabación pasada.
+  return v.snippet.liveBroadcastContent==='live' &&
+    !v.liveStreamingDetails?.actualEndTime;
 }
-function redirectId(url) {
-  try{
-    const u=new URL(url);
-    if (!['www.youtube.com','youtube.com','m.youtube.com'].includes(u.hostname))return null;
-    if(u.pathname==='/watch')return isId(u.searchParams.get('v'))?u.searchParams.get('v'):null;
-    if(u.pathname.startsWith('/live/')){const v=u.pathname.slice(6);return isId(v)?v:null}
-  }catch(_){}
-  return null;
+function sortLive(a,b){
+  const aUri=/uritorco/i.test(a.snippet?.title||'');
+  const bUri=/uritorco/i.test(b.snippet?.title||'');
+  if(aUri!==bUri)return bUri?1:-1;
+  return new Date(b.liveStreamingDetails?.actualStartTime||b.snippet?.publishedAt||0)-
+    new Date(a.liveStreamingDetails?.actualStartTime||a.snippet?.publishedAt||0);
 }
-function allActiveVideoRenderers(html) {
-  const data=jsonObjectAfter(html,['var ytInitialData = ','ytInitialData = ','window["ytInitialData"] = ']);
-  if(!data)return [];
-  const stack=[data],live=[];
-  let visited=0;
-  while(stack.length && visited++ < 45000){
-    const node=stack.pop();
-    if(!node || typeof node!=='object')continue;
-    const vid=node.videoRenderer || node.gridVideoRenderer || node.richItemRenderer?.content?.videoRenderer;
-    if(vid && isId(vid.videoId)){
-      const badges=(vid.badges||[]).some(b=>{
-        const x=b.metadataBadgeRenderer||{};
-        return x.style==='BADGE_STYLE_TYPE_LIVE_NOW' || /^(live|en vivo|en directo)$/i.test(x.label||'');
-      });
-      const overlay=(vid.thumbnailOverlays||[]).some(x=>{
-        const s=x.thumbnailOverlayTimeStatusRenderer||{};
-        const labels=[...(s.text?.runs||[]).map(x=>x.text),s.text?.simpleText].filter(Boolean).join(' ');
-        return s.style==='LIVE' || /^(live|en vivo|en directo)$/i.test(labels);
-      });
-      if(badges || overlay || vid.isLiveNow===true){
-        const title=(vid.title?.runs||[]).map(x=>x.text).join(' ')||vid.title?.simpleText||'';
-        live.push({id:vid.videoId,title});
-      }
-    }
-    if(Array.isArray(node))stack.push(...node);
-    else for(const value of Object.values(node))if(value&&typeof value==='object')stack.push(value);
-  }
-  return live.sort((a,b)=>Number(/uritorco/i.test(b.title))-Number(/uritorco/i.test(a.title)));
-}
-function rssIds(xml) {
-  if(!xml)return [];
-  const ids=[...xml.matchAll(/<yt:videoId>([A-Za-z0-9_-]{11})<\/yt:videoId>/g)].map(x=>x[1]);
-  return [...new Set(ids)].slice(0,5);
-}
-async function officialApi() {
-  const key=process.env.YOUTUBE_API_KEY;
-  if(!key)return null;
-  try{
-    const u=new URL('https://www.googleapis.com/youtube/v3/search');
-    for(const [k,v] of Object.entries({part:'snippet',channelId:CHANNEL_ID,eventType:'live',type:'video',maxResults:'8',key}))u.searchParams.set(k,v);
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4500);
-    try{
-      const r=await fetch(u,{signal:controller.signal});
-      if(!r.ok)return null;
-      const doc=await r.json();
-      const list=(doc.items||[]).filter(x=>isId(x.id?.videoId)&&x.snippet?.liveBroadcastContent==='live');
-      list.sort((a,b)=>Number(/uritorco/i.test(b.snippet?.title||''))-Number(/uritorco/i.test(a.snippet?.title||'')));
-      return list.length?{id:list[0].id.videoId,title:list[0].snippet?.title||'',source:'youtube-api'}:null;
-    }finally{clearTimeout(timer)}
-  }catch(_){return null}
+function result(v,source,id){
+  return {
+    status:'live',live:true,videoId:v.id,title:v.snippet?.title||null,
+    channelId:id,channelUrl:CHANNEL_URL,source,
+    checkedAt:new Date().toISOString()
+  };
 }
 export default async function handler(req,res){
   res.setHeader('Content-Type','application/json; charset=utf-8');
-  // La API oficial de YouTube tiene cuota: 15 min de caché si hay API key para no agotarla.
-  res.setHeader('Cache-Control',process.env.YOUTUBE_API_KEY?'public,s-maxage=900,stale-while-revalidate=120':'public,s-maxage=120,stale-while-revalidate=60');
+  res.setHeader('X-Content-Type-Options','nosniff');
+  const deep=req.query?.deep==='1';
+  // La búsqueda profunda tiene caché propia: evita agotar el límite diario de search.list.
+  res.setHeader('Cache-Control',deep?'public, s-maxage=1500, stale-while-revalidate=120':'public, s-maxage=110, stale-while-revalidate=30');
   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
-  let active=null,source=null,title=null,seedState=null;
-  // 1. Consultar el endpoint del directo del canal, sin seleccionar recomendaciones.
-  const direct=await load(CHANNEL_LINK);
-  if(direct){
-    const id=redirectId(direct.finalUrl);
-    const v=checkBroadcast(direct.text,id);
-    if(id && v.live!==false){
-      active=id;source='channel-live';title=v.title;
-    }else if(v.live===true && isId(v.id)){
-      active=v.id;source='channel-player';title=v.title;
-    }
-  }
-  // 2. La pestaña transmisiones puede enumerar los vivos actuales (sin confundirlos con archivos).
-  if(!active){
-    const streams=await load(CHANNEL+'/streams');
-    const candidates=streams?allActiveVideoRenderers(streams.text):[];
-    if(candidates.length){
-      active=candidates[0].id;source='channel-streams';title=candidates[0].title;
-    }
-  }
-  // 3. Verificar el video compartido directamente: solo si sigue realmente en vivo.
-  if(!active){
-    const known=await load('https://www.youtube.com/watch?v='+RECENTLY_SHARED_VIDEO_ID,4200);
-    seedState=known?checkBroadcast(known.text,RECENTLY_SHARED_VIDEO_ID):{live:null};
-    if(seedState.live===true){
-      active=RECENTLY_SHARED_VIDEO_ID;source='watch-verified';title=seedState.title;
-    }
-  }
-  // 4. Un feed puede revelar un directo recién iniciado aunque /streams no se actualice.
-  if(!active){
-    const feed=await load('https://www.youtube.com/feeds/videos.xml?channel_id='+CHANNEL_ID,3600);
-    const ids=rssIds(feed?.text);
-    for(const id of ids.slice(0,4)){
-      if(id===RECENTLY_SHARED_VIDEO_ID && seedState?.live===false)continue;
-      const watch=await load('https://www.youtube.com/watch?v='+id,2800);
-      const result=watch?checkBroadcast(watch.text,id):{live:null};
-      if(result.live===true){active=id;source='channel-feed';title=result.title;break}
-    }
-  }
-  // 5. API oficial, si existe una clave configurada en el servidor (nunca en el navegador).
-  if(!active){
-    const official=await officialApi();
-    if(official){active=official.id;source=official.source;title=official.title}
-  }
-  // No etiquetar como EN VIVO un video que YouTube no confirmó. La URL reciente es un
-  // intento temporal en caso de que YouTube bloquee nuestras lecturas automáticas.
-  const recentCandidate=!active&&seedState?.live!==false&&Date.now()<RECENTLY_SHARED_UNTIL?RECENTLY_SHARED_VIDEO_ID:null;
-  return res.status(200).json({
-    status:active?'live':recentCandidate?'unverified':seedState?.live===false?'offline':'unavailable',
-    videoId:active||recentCandidate,
-    live:Boolean(active),
-    verified:Boolean(active),
-    title:title||null,
-    source:source|| (recentCandidate?'recent-user-link':null),
-    channelId:CHANNEL_ID,
-    channelUrl:CHANNEL_LINK,
-    checkedAt:new Date().toISOString(),
-    expiresAt:recentCandidate?new Date(RECENTLY_SHARED_UNTIL).toISOString():null
+  const key=process.env.YOUTUBE_API_KEY;
+  if(!key)return answer(res,'configuration_required',{
+    title:null,source:'youtube-data-api',errorCode:'api_key_not_configured',
+    message:'La conexión con YouTube Data API todavía no está configurada.'
   });
+  try {
+    // forHandle identifica al canal real y su playlist de subidas sin depender de un ID deducido.
+    const channels=await request('channels',{part:'snippet,contentDetails',forHandle:HANDLE,maxResults:1},key);
+    const channel=channels.items?.[0];
+    if(!channel?.id)return answer(res,'api_error',{errorCode:'channel_not_found',message:'No se pudo validar el canal de YouTube.'});
+    const id=channel.id,uploads=channel.contentDetails?.relatedPlaylists?.uploads;
+    let live=[],errorCode=null;
+    // Rápido (y económico): las últimas subidas, incluidas transmisiones publicadas por el canal.
+    if(uploads){
+      const list=await request('playlistItems',{part:'contentDetails',playlistId:uploads,maxResults:40},key);
+      const ids=[...new Set((list.items||[]).map(x=>x.contentDetails?.videoId).filter(isId))].slice(0,40);
+      if(ids.length){
+        const videos=await request('videos',{part:'snippet,liveStreamingDetails,status',id:ids.join(',')},key);
+        live=(videos.items||[]).filter(v=>activeVideo(v,id));
+      }
+    }
+    // La búsqueda profunda descubre directos que todavía no aparecen en la lista de subidas.
+    // Se utiliza una URL y un caché separados, no en cada sondeo de 2 minutos.
+    if(deep){
+      try{
+        const search=await request('search',{
+          part:'snippet',channelId:id,eventType:'live',type:'video',maxResults:20,order:'date'
+        },key);
+        const ids=[...new Set((search.items||[]).map(x=>x.id?.videoId).filter(isId))];
+        if(ids.length){
+          const videos=await request('videos',{part:'snippet,liveStreamingDetails,status',id:ids.join(',')},key);
+          const found=(videos.items||[]).filter(v=>activeVideo(v,id));
+          live=[...live,...found];
+        }
+      }catch(err){errorCode=String(err.message||err).slice(0,120)}
+    }
+    const selected=[...new Map(live.map(v=>[v.id,v])).values()].sort(sortLive)[0];
+    if(selected)return res.status(200).json(result(selected,deep?'playlist-and-live-search':'uploads-playlist',id));
+    return answer(res,'offline',{channelId:id,title:null,source:deep?'youtube-live-search':'uploads-playlist',errorCode:deep?errorCode:null});
+  }catch(err){
+    // No exponer el valor de la clave, URLs de solicitud ni detalles internos.
+    const m=String(err.message||err);
+    const errorCode=/quotaExceeded|rateLimitExceeded/i.test(m)?'quota_exceeded':
+      /keyInvalid|API_KEY_INVALID|accessNotConfigured|SERVICE_DISABLED|API_KEY_SERVICE_BLOCKED/i.test(m)?'api_key_error':
+      /AbortError|aborted|timeout/i.test(m)?'timeout':'youtube_api_error';
+    return answer(res,'api_error',{errorCode,message:'No pudimos consultar el estado del vivo en YouTube.'});
+  }
 }

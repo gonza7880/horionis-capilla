@@ -1,163 +1,173 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-const CURRENT_PROVIDED='OyIJiYTY61g';
-const CURRENT_PROVIDED_UNTIL=Date.parse('2026-10-27T04:00:00Z');
-const CHANNEL_LIVE='https://www.youtube.com/@MagiaDelMonte/live';
-const isId=value=>typeof value==='string'&&/^[A-Za-z0-9_-]{11}$/.test(value);
-const state={activeId:null,verified:false,player:null,version:0,api:null,checking:false,blockedId:null,ended:new Set(),currentLink:CHANNEL_LIVE};
-const videoLink=id=>'https://www.youtube.com/watch?v='+encodeURIComponent(id);
+const CHANNEL_URL='https://www.youtube.com/@MagiaDelMonte/live';
+const validId=v=>typeof v==='string'&&/^[A-Za-z0-9_-]{11}$/.test(v);
+const state={videoId:null,player:null,version:0,api:null,checking:false,blocked:new Set(),ended:new Set(),currentLink:CHANNEL_URL,lastDeep:0,ready:false};
+const link=id=>'https://www.youtube.com/watch?v='+encodeURIComponent(id);
 function clock(){
-  $('uriClock').textContent=new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date())+' ART';
+  $('uriClock').textContent=new Intl.DateTimeFormat('es-AR',{
+    timeZone:'America/Argentina/Buenos_Aires',hour:'2-digit',minute:'2-digit',hour12:false
+  }).format(new Date())+' ART';
 }
-function status(text,detail,live){
-  $('uriStateText').textContent=text;$('uriSideState').textContent=detail;
-  $('uriLed').classList.toggle('active',!!live);
+function setStatus(text,sub,isLive){
+  $('uriStateText').textContent=text;
+  $('uriSideState').textContent=sub;
+  $('uriLed').classList.toggle('active',Boolean(isLive));
 }
-function links(id){
-  state.currentLink=id?videoLink(id):CHANNEL_LIVE;
+function setLink(id){
+  state.currentLink=validId(id)?link(id):CHANNEL_URL;
   document.querySelectorAll('[data-uri-video-link]').forEach(a=>a.href=state.currentLink);
 }
-function removePlayer(){
+function stopPlayer(){
   state.version++;
-  const existing=state.player;
-  state.player=null;state.activeId=null;state.verified=false;
-  if(existing){try{existing.destroy()}catch(_){}}
+  const player=state.player;
+  state.player=null;state.videoId=null;
+  if(player){try{player.destroy()}catch(_){}}
   $('uriPlayerHost').replaceChildren();
   $('uriPlayerHost').hidden=true;
   $('uriSound').hidden=true;
 }
-function standby(heading,message,detail,label='CÁMARA TEMPORALMENTE FUERA DE LÍNEA'){
-  removePlayer();
+function placeholder(h,description,status,subtitle){
+  if(state.videoId||state.player)stopPlayer();
   $('uriIntro').hidden=false;
-  $('uriIntro').querySelector('h3').textContent=heading;
-  $('uriHint').textContent=message;
-  $('uriPlay').textContent='Abrir canal de YouTube ↗';
-  $('uriVideoLabel').textContent='SOLO TRANSMISIONES EN DIRECTO · SIN GRABACIONES';
-  status(label,detail,false);
-  links(null);
+  $('uriIntro').querySelector('h3').textContent=h;
+  $('uriHint').textContent=description;
+  $('uriPlay').textContent='Abrir canal en YouTube ↗';
+  $('uriVideoLabel').textContent='SOLO EN DIRECTO · SIN GRABACIONES';
+  setStatus(status,subtitle,false);
+  setLink(null);
 }
 function youtubeAPI(){
   if(window.YT?.Player)return Promise.resolve(window.YT);
   if(state.api)return state.api;
   state.api=new Promise((resolve,reject)=>{
-    let settled=false;
+    let finished=false;
     const previous=window.onYouTubeIframeAPIReady;
-    const timeout=setTimeout(()=>finish(new Error('YouTube no respondió')),11000);
-    function finish(error){
-      if(settled)return;
-      settled=true;clearTimeout(timeout);
+    const timer=setTimeout(()=>done(new Error('Timeout')),11000);
+    function done(error){
+      if(finished)return;finished=true;clearTimeout(timer);
       if(error)reject(error);else resolve(window.YT);
     }
     window.onYouTubeIframeAPIReady=()=>{
       if(typeof previous==='function'){try{previous()}catch(_){}}
-      finish(null);
+      done(null);
     };
     const script=document.createElement('script');
     script.src='https://www.youtube.com/iframe_api';script.async=true;
-    script.onerror=()=>finish(new Error('YouTube bloqueó su reproductor'));
+    script.onerror=()=>done(new Error('Player unavailable'));
     document.head.appendChild(script);
-  }).catch(e=>{state.api=null;throw e});
+  }).catch(error=>{state.api=null;throw error});
   return state.api;
 }
-function fallbackIframe(id,v){
-  if(v!==state.version)return;
-  const f=document.createElement('iframe');
-  f.src='https://www.youtube.com/embed/'+encodeURIComponent(id)+'?autoplay=1&mute=1&playsinline=1&rel=0';
-  f.title='Señal de Magia del Monte en Capilla del Monte';
-  f.allow='autoplay; encrypted-media; picture-in-picture; fullscreen';f.allowFullscreen=true;
-  f.referrerPolicy='strict-origin-when-cross-origin';
-  $('uriPlayerHost').replaceChildren(f);
-  $('uriVideoLabel').textContent='TRANSMISIÓN DE YOUTUBE · PUEDE REQUERIR ▶';
-}
-async function play(id,verified){
-  if(!isId(id)||state.ended.has(id))return;
-  if(state.activeId===id){
-    if(verified&&!state.verified){
-      state.verified=true;status('SEÑAL EN DIRECTO DETECTADA','Magia del Monte · emisión confirmada',true);
-      $('uriVideoLabel').textContent='● EN VIVO · MAGIA DEL MONTE · AUDIO SILENCIADO AL INICIAR';
-    }
-    return;
-  }
-  if(state.blockedId===id)return;
-  removePlayer();
-  const v=state.version;
-  state.activeId=id;state.verified=Boolean(verified);
-  links(id);
-  $('uriIntro').hidden=true;$('uriPlayerHost').hidden=false;
+async function start(id,title){
+  if(!validId(id)||state.ended.has(id)||state.blocked.has(id))return;
+  if(state.videoId===id)return;
+  stopPlayer();
+  const version=state.version;
+  state.videoId=id;
+  setLink(id);
+  $('uriIntro').hidden=true;
+  $('uriPlayerHost').hidden=false;
   $('uriPlayerHost').replaceChildren(Object.assign(document.createElement('div'),{id:'uriYTPlayer'}));
-  status(verified?'SEÑAL EN DIRECTO DETECTADA':'VERIFICANDO SEÑAL COMPARTIDA',verified?'Magia del Monte · directo':'Esperando confirmación de YouTube',verified);
-  $('uriVideoLabel').textContent=verified?'● EN VIVO · MAGIA DEL MONTE':'SEÑAL RECIENTE COMPARTIDA · VALIDACIÓN PENDIENTE';
+  $('uriVideoLabel').textContent='● CONECTANDO TRANSMISIÓN ACTIVA · AUDIO SILENCIADO';
+  setStatus('SEÑAL EN DIRECTO ENCONTRADA',title||'Magia del Monte',true);
   try{
     const YT=await youtubeAPI();
-    if(v!==state.version)return;
+    if(version!==state.version)return;
     state.player=new YT.Player('uriYTPlayer',{
       width:'100%',height:'100%',videoId:id,
       playerVars:{autoplay:1,mute:1,playsinline:1,controls:1,rel:0,origin:location.origin},
       events:{
-        onReady:e=>{if(v!==state.version)return;e.target.mute();e.target.playVideo()},
+        onReady:e=>{
+          if(version!==state.version)return;
+          e.target.mute();e.target.playVideo();
+        },
         onStateChange:e=>{
-          if(v!==state.version)return;
+          if(version!==state.version)return;
           if(e.data===YT.PlayerState.PLAYING){
             $('uriSound').hidden=false;
             $('uriSound').textContent=state.player?.isMuted()?'♫ Activar sonido':'♫ Silenciar';
-            // Reproduciendo no prueba que sea vivo: mantener estado pendiente hasta verificar.
-            if(state.verified){
-              status('SEÑAL EN DIRECTO · REPRODUCIENDO','Magia del Monte · transmisión activa',true);
-              $('uriVideoLabel').textContent='● EN VIVO · MAGIA DEL MONTE · INICIO SIN SONIDO';
-            }
+            $('uriVideoLabel').textContent='● EN VIVO · MAGIA DEL MONTE · INICIO SIN SONIDO';
+            setStatus('EN VIVO · REPRODUCIENDO',title||'Magia del Monte',true);
           }
           if(e.data===YT.PlayerState.ENDED){
             state.ended.add(id);
-            standby('Transmisión finalizada','Este directo terminó. Buscamos automáticamente la siguiente transmisión, sin reproducir archivos anteriores.','Esperando nuevo vivo');
-            refresh();
+            placeholder('Transmisión finalizada','Buscando la siguiente cámara activa de Magia del Monte.','BUSCANDO PRÓXIMO DIRECTO','El canal cambió de emisión');
+            refresh(true);
           }
         },
         onError:()=>{
-          if(v!==state.version)return;
-          state.blockedId=id;
-          standby('Reproductor no disponible','YouTube no permite mostrar esta transmisión en Horionis. Consultá el vivo en el canal original.','Abrir canal original','SEÑAL NO INSERTABLE');
+          if(version!==state.version)return;
+          state.blocked.add(id);
+          placeholder('Señal no disponible','YouTube no permite reproducir esta cámara dentro de Horionis. Abrí el canal original para verla.','REPRODUCCIÓN EXTERNA RESTRINGIDA','Ver en el canal de YouTube');
         },
         onAutoplayBlocked:()=>{
-          if(v===state.version)$('uriVideoLabel').textContent='TU NAVEGADOR PIDE PULSAR ▶ · SEÑAL SIN SONIDO';
+          if(version===state.version)$('uriVideoLabel').textContent='AUTOPLAY BLOQUEADO EN ESTE NAVEGADOR · PULSÁ ▶';
         }
       }
     });
-  }catch(_){fallbackIframe(id,v)}
+  }catch(_){
+    if(version!==state.version)return;
+    // Usar únicamente el ID verificado por YouTube Data API.
+    const iframe=document.createElement('iframe');
+    iframe.src='https://www.youtube.com/embed/'+encodeURIComponent(id)+'?autoplay=1&mute=1&playsinline=1&rel=0';
+    iframe.title='En vivo desde Magia del Monte';
+    iframe.allow='autoplay; encrypted-media; picture-in-picture; fullscreen';
+    iframe.referrerPolicy='strict-origin-when-cross-origin';
+    iframe.allowFullscreen=true;
+    $('uriPlayerHost').replaceChildren(iframe);
+  }
 }
-async function refresh(){
+async function query(deep){
+  const url=deep?'/api/uritorco?deep=1':'/api/uritorco';
+  const response=await fetch(url,{cache:'default'});
+  if(!response.ok)throw Error('HTTP '+response.status);
+  return response.json();
+}
+async function refresh(forceDeep=false){
   if(state.checking)return;
   state.checking=true;
   try{
-    const response=await fetch('/api/uritorco',{cache:'no-store'});
-    if(!response.ok)throw new Error('Falla la consulta');
-    const data=await response.json();
-    const id=isId(data.videoId)?data.videoId:null;
-    if(data.status==='live'&&id&&!state.ended.has(id)){
-      await play(id,true); // reemplaza un directo anterior si cambió el videoId
-    }else if(data.status==='unverified'&&id&&Date.now()<Date.parse(data.expiresAt||0)&&!state.activeId&&!state.ended.has(id)){
-      await play(id,false);
+    let data=await query(false);
+    const discovered=validId(data.videoId)&&data.status==='live';
+    const needsDeep=forceDeep||(!discovered&&Date.now()-state.lastDeep>25*60*1000);
+    if(needsDeep&&data.status!=='configuration_required'){
+      state.lastDeep=Date.now();
+      const deep=await query(true);
+      if(deep.status==='live'&&validId(deep.videoId))data=deep;
+      else if(data.status!=='live')data=deep;
+    }
+    if(data.status==='live'&&validId(data.videoId)){
+      if(state.ended.has(data.videoId)){
+        if(!state.videoId)placeholder('Esperando nueva transmisión','El vivo anterior ya terminó. Horionis seguirá buscando el nuevo.','CAMBIO DE CÁMARA','Esperando señal nueva');
+      }else if(!state.blocked.has(data.videoId)){
+        await start(data.videoId,data.title);
+      }else if(!state.videoId){
+        placeholder('Ver en YouTube','Esta transmisión no admite reproducción integrada.','SEÑAL NO INSERTABLE','Abrir canal original');
+      }
+    }else if(data.status==='configuration_required'){
+      placeholder('Conexión en preparación','Estamos habilitando la detección automática de las cámaras del canal. Podés ver el directo en YouTube.','CONECTANDO YOUTUBE DATA API','Integración pendiente');
     }else if(data.status==='offline'){
-      standby('Cámara temporalmente fuera de línea','No se detecta una transmisión activa de Magia del Monte. La página seguirá buscando automáticamente.','Sin vivo confirmado');
-    }else if(!state.activeId){
-      standby('Esperando transmisión','No pudimos identificar un directo activo. Seguiremos revisando el canal y el enlace se actualizará cuando haya señal.','Consultando Magia del Monte','BUSCANDO NUEVA SEÑAL');
+      if(state.videoId)stopPlayer();
+      placeholder('Cámara temporalmente fuera de línea','No hay un directo confirmado de Magia del Monte. La página seguirá comprobando las emisiones.','SIN DIRECTO ACTIVO','Esperando nueva emisión');
+    }else if(!state.videoId){
+      placeholder('Consultando la señal','No podemos verificar el directo en este momento. La página seguirá intentándolo.','SEÑAL NO VERIFICADA','Consultar canal original');
     }
   }catch(_){
-    if(!state.activeId)standby('Señal no verificable','La conexión con YouTube no respondió. Podés abrir el canal original mientras Horionis vuelve a comprobar el vivo.','Consulta temporalmente no disponible','BUSCANDO NUEVA SEÑAL');
-  }finally{state.checking=false}
+    if(!state.videoId)placeholder('Sin señal confirmada','No se pudo consultar YouTube. Probá abrir el canal original.','CONEXIÓN TEMPORALMENTE NO DISPONIBLE','Esperando YouTube');
+  }finally{state.checking=false;state.ready=true}
 }
 $('uriPlay').addEventListener('click',()=>window.open(state.currentLink,'_blank','noopener,noreferrer'));
-$('uriRefresh').addEventListener('click',()=>{state.blockedId=null;refresh()});
+$('uriRefresh').addEventListener('click',()=>{state.blocked.clear();refresh(true)});
 $('uriSound').addEventListener('click',()=>{
   if(!state.player||typeof state.player.isMuted!=='function')return;
   if(state.player.isMuted()){state.player.unMute();$('uriSound').textContent='♫ Silenciar'}
   else{state.player.mute();$('uriSound').textContent='♫ Activar sonido'}
 });
 clock();setInterval(clock,30000);
-links(CURRENT_PROVIDED);
-// La transmisión aportada por el usuario se intenta abrir inmediatamente, pero expira.
-if(Date.now()<CURRENT_PROVIDED_UNTIL)play(CURRENT_PROVIDED,false);
-else standby('Buscando el vivo','Detectando la emisión actual de Magia del Monte.','Buscando nueva señal','BUSCANDO NUEVA SEÑAL');
+setLink(null);
+placeholder('Buscando el vivo','Consultando las cámaras de Magia del Monte.','BUSCANDO SEÑAL','Verificando YouTube');
 refresh();
 setInterval(refresh,120000);
 })();
