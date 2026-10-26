@@ -34,9 +34,8 @@ function activeVideo(v,channelId){
     !v.liveStreamingDetails?.actualEndTime;
 }
 function sortLive(a,b){
-  const aUri=/uritorco/i.test(a.snippet?.title||'');
-  const bUri=/uritorco/i.test(b.snippet?.title||'');
-  if(aUri!==bUri)return bUri?1:-1;
+  // La señal vigente es el directo iniciado más recientemente: nunca priorizar por el título.
+  // Puede haber dos cámaras en vivo simultáneas y la del Uritorco ser la más antigua.
   return new Date(b.liveStreamingDetails?.actualStartTime||b.snippet?.publishedAt||0)-
     new Date(a.liveStreamingDetails?.actualStartTime||a.snippet?.publishedAt||0);
 }
@@ -52,7 +51,7 @@ export default async function handler(req,res){
   res.setHeader('X-Content-Type-Options','nosniff');
   const deep=req.query?.deep==='1';
   // La búsqueda profunda tiene caché propia: evita agotar el límite diario de search.list.
-  res.setHeader('Cache-Control',deep?'public, s-maxage=1500, stale-while-revalidate=120':'public, s-maxage=110, stale-while-revalidate=30');
+  res.setHeader('Cache-Control',req.query?.inspect?'no-store':deep?'public, s-maxage=1200, stale-while-revalidate=120':'public, s-maxage=85, stale-while-revalidate=15');
   if(req.method!=='GET')return res.status(405).json({error:'Method not allowed'});
   const key=process.env.YOUTUBE_API_KEY;
   if(!key)return answer(res,'configuration_required',{
@@ -65,6 +64,19 @@ export default async function handler(req,res){
     const channel=channels.items?.[0];
     if(!channel?.id)return answer(res,'api_error',{errorCode:'channel_not_found',message:'No se pudo validar el canal de YouTube.'});
     const id=channel.id,uploads=channel.contentDetails?.relatedPlaylists?.uploads;
+    // Inspección temporal: permite validar un ID compartido comparándolo con la API oficial.
+    if(isId(req.query?.inspect)){
+      const inspected=await request('videos',{part:'snippet,liveStreamingDetails,status',id:req.query.inspect},key);
+      const v=inspected.items?.[0];
+      return answer(res,v&&activeVideo(v,id)?'live':'offline',{
+        videoId:v?.id||null,channelId:id,source:'inspection',
+        requestedVideoId:req.query.inspect,title:v?.snippet?.title||null,
+        videoChannelId:v?.snippet?.channelId||null,
+        broadcastState:v?.snippet?.liveBroadcastContent||null,
+        actualStartTime:v?.liveStreamingDetails?.actualStartTime||null,
+        actualEndTime:v?.liveStreamingDetails?.actualEndTime||null
+      });
+    }
     let live=[],errorCode=null;
     // Rápido (y económico): las últimas subidas, incluidas transmisiones publicadas por el canal.
     if(uploads){

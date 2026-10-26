@@ -131,7 +131,7 @@ async function refresh(forceDeep=false){
   try{
     let data=await query(false);
     const discovered=validId(data.videoId)&&data.status==='live';
-    const needsDeep=forceDeep||(!discovered&&Date.now()-state.lastDeep>25*60*1000);
+    const needsDeep=forceDeep||(Date.now()-state.lastDeep>22*60*1000);
     if(needsDeep&&data.status!=='configuration_required'){
       state.lastDeep=Date.now();
       const deep=await query(true);
